@@ -470,7 +470,7 @@ Module.register("MMM-Currentweather-MQTT",{
 	notificationReceived: function(notification, payload, sender) {
 		if (notification === "DOM_OBJECTS_CREATED") {
 			if (this.config.appendLocationNameToHeader) {
-				this.hide(0, {lockString: this.identifier});
+				this.hide(0, function() {}, {lockString: this.identifier});
 			}
 		}
 		if (notification === "CALENDAR_EVENTS") {
@@ -565,7 +565,7 @@ Module.register("MMM-Currentweather-MQTT",{
 		} else if (this.firstEvent && this.firstEvent.location) {
 			params += "q=" + this.firstEvent.location;
 		} else {
-			this.hide(this.config.animationSpeed, {lockString:this.identifier});
+			this.hide(this.config.animationSpeed, function() {}, {lockString:this.identifier});
 			return;
 		}
 
@@ -763,7 +763,9 @@ Module.register("MMM-Currentweather-MQTT",{
 		this.sunriseSunsetTime = timeString;
 		this.sunriseSunsetIcon = (sunrise < now && sunset > now) ? "wi-sunset" : "wi-sunrise";
 
-		this.show(this.config.animationSpeed, {lockString:this.identifier});
+		this.show(this.config.animationSpeed, function() {
+			Log.log('Module is shown.');
+		}, {lockString:this.identifier});
 		this.loaded = true;
 		this.updateDom(this.config.animationSpeed);
 		this.sendNotification("CURRENTWEATHER_DATA", {data: data});
