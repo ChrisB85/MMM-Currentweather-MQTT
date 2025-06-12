@@ -21,7 +21,6 @@ module.exports = NodeHelper.create({
 	},
 
 	addServer: function (server) {
-		console.log(this.name + ': Adding server: ', server);
 		var serverKey = this.makeServerKey(server);
 		var mqttServer = {}
 		var foundServer = false;
