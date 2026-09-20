@@ -173,3 +173,78 @@ Here is an example configuration with description. Put it in the `MagicMirror/co
             </tr>
         </tbody>
 </table>
+
+## Value sources
+
+Every displayed value names the sources to try, in order. The first source that
+currently has a usable value wins; a source whose last reading is older than its
+`maxAgeSeconds` counts as unavailable, so a dead broker or an unreachable Home
+Assistant makes the mirror fall through to the next source instead of showing a
+frozen number.
+
+| Source | Where the value comes from |
+|---|---|
+| `mqtt` | The MQTT subscriptions configured in `mqttServers`, i.e. the local sensors. |
+| `hass` | Home Assistant REST API. Shows the same numbers Home Assistant does. |
+| `metno` | MET Norway (yr.no) — the API behind Home Assistant's met.no integration. |
+| `owm` | OpenWeatherMap, fetched with every update. Never expires, so it is the safe last entry. |
+
+```js
+sources: {
+    temperature:   ["mqtt", "owm"],            // local sensor first
+    humidity:      ["mqtt", "owm"],
+    windSpeed:     ["hass", "metno", "owm"],   // no wind sensor here
+    windDirection: ["hass", "metno", "owm"],
+},
+```
+
+Leaving `sources` out keeps the previous behaviour: MQTT first, OpenWeatherMap
+as the fallback.
+
+Wind speeds are normalised to meters per second before `useBeaufort` /
+`useKMPHwind` turn them into the displayed unit, so every source may report in
+its own unit. `mqttWindSpeedUnit` (default `kmh`) declares what the MQTT topic
+publishes; Home Assistant entities declare theirs per entity. This also fixes an
+older inconsistency: with `useBeaufort` the MQTT wind speed used to be read as
+m/s while the other display modes treated it as km/h.
+
+Values that did not come from a local sensor are printed in yellow, as before.
+
+### `metno`
+
+```js
+metno: {
+    lat: 50.669907,
+    lon: 17.9010475,
+    userAgent: "MagicMirror/2.31 (you@example.com)",  // required, see below
+    updateInterval: 15 * 60 * 1000,
+    maxAgeSeconds: 3600,
+},
+```
+
+The met.no terms of service require an identifying `User-Agent` carrying a
+contact address; requests without one are rejected. Browsers refuse to let a
+page set that header, so this source is fetched in `node_helper.js`, which also
+sends `If-Modified-Since` as the terms ask. Without `userAgent` the source stays
+disabled and logs a warning.
+
+### `hass`
+
+```js
+hass: {
+    host: "homeassistant.local",
+    port: 8123,
+    useTLS: false,
+    token: "",                       // long-lived access token
+    updateInterval: 5 * 60 * 1000,
+    maxAgeSeconds: 1800,
+    entities: {
+        windSpeed:     { entity: "weather.forecast_home", attribute: "wind_speed", unit: "kmh" },
+        windDirection: { entity: "weather.forecast_home", attribute: "wind_bearing" },
+    },
+},
+```
+
+Each entry reads one entity attribute, or the entity state when `attribute` is
+omitted. Entities reporting `unavailable` or `unknown` are skipped. Without a
+`token` or with an empty `entities` map the source stays disabled.

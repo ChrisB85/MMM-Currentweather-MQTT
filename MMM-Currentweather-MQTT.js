@@ -73,6 +73,42 @@ Module.register("MMM-Currentweather-MQTT",{
 
 		mqttServers: [],
 
+		// Where every value comes from. The sources are tried in the order
+		// listed; the first one that currently has a usable value wins.
+		// Known sources: "mqtt", "hass", "metno", "owm".
+		sources: {
+			temperature: ["mqtt", "owm"],
+			humidity: ["mqtt", "owm"],
+			windSpeed: ["mqtt", "owm"],
+			windDirection: ["mqtt", "owm"]
+		},
+
+		// Unit the MQTT wind speed topic publishes in: "kmh", "ms", "mph" or "kn".
+		mqttWindSpeedUnit: "kmh",
+
+		// MET Norway (yr.no) - the API behind Home Assistant's met.no integration.
+		metno: {
+			lat: null,
+			lon: null,
+			userAgent: "",                  // required by the met.no terms of service, must carry a contact address
+			updateInterval: 15 * 60 * 1000,
+			maxAgeSeconds: 3600
+		},
+
+		// Home Assistant REST API. Fetching from Home Assistant keeps the mirror
+		// showing the same numbers Home Assistant does.
+		hass: {
+			host: "",
+			port: 8123,
+			useTLS: true,
+			token: "",                      // long-lived access token
+			updateInterval: 5 * 60 * 1000,
+			maxAgeSeconds: 1800,
+			// value key -> { entity, attribute, unit }
+			// attribute omitted reads the entity state instead of an attribute
+			entities: {}
+		},
+
 	},
 
 	// Indizes für den Zugriff auf die subscriptions
@@ -86,15 +122,15 @@ Module.register("MMM-Currentweather-MQTT",{
 	indexTempMax: 7,
 	indexTempMin: 8,
 
-	// woher stammen die Werte OpenWeather oder MQTT
-	sourceHum: "OW",
-	sourceTemp: "OW",
-	sourceWindSpeed: "OW",
-	sourceWindDir: "OW",
-	sourceRaining: "OW",
-	sourceRainfall: "OW",
-	sourceTempMax: "MQTT",
-	sourceTempMin: "MQTT",
+	// Name of the source each displayed value came from, see config.sources.
+	sourceHum: "owm",
+	sourceTemp: "owm",
+	sourceWindSpeed: "owm",
+	sourceWindDir: "owm",
+	sourceRaining: "owm",
+	sourceRainfall: "owm",
+	sourceTempMax: "mqtt",
+	sourceTempMin: "mqtt",
 
 
 
@@ -116,7 +152,7 @@ Module.register("MMM-Currentweather-MQTT",{
 	
 	// Define required scripts.
 	getScripts: function() {
-		return ["moment.js"];
+		return ["moment.js", "modules/MMM-Currentweather-MQTT/weathersources.js"];
 	},
 
 	// Define required scripts.
@@ -137,6 +173,15 @@ Module.register("MMM-Currentweather-MQTT",{
 		Log.info("Starting module: " + this.name);
 
 		this.subscriptions = [];
+
+		// Module config is merged with the defaults one level deep only, so a
+		// config setting just metno.lat would drop the other metno defaults.
+		this.config.sources = Object.assign({}, this.defaults.sources, this.config.sources);
+		this.config.metno = Object.assign({}, this.defaults.metno, this.config.metno);
+		this.config.hass = Object.assign({}, this.defaults.hass, this.config.hass);
+
+		// Readings pushed by node_helper, keyed by source name.
+		this.externalValues = {};
 
 		Log.info(this.name + ": Setting up connection to " + this.config.mqttServers.length + " servers");
 	
@@ -199,6 +244,11 @@ Module.register("MMM-Currentweather-MQTT",{
 
 	openMqttConnection: function() {
 		this.sendSocketNotification("MQTT_CONFIG", this.config);
+		this.sendSocketNotification("WEATHER_SOURCE_CONFIG", {
+			metno: this.config.metno,
+			hass: this.config.hass,
+			logging: this.config.logging
+		});
 	},
 		
 	// add extra information of current weather
@@ -213,7 +263,7 @@ Module.register("MMM-Currentweather-MQTT",{
 
 		var windIcon = document.createElement("span");
 		windIcon.className = "wi wi-strong-wind dimmed";
-		if (this.sourceWindDir === "OW") {
+		if (this.isRemoteSource(this.sourceWindDir)) {
 			windIcon.className = windIcon.className + " yellow";
 		}
 		small.appendChild(windIcon);
@@ -223,7 +273,7 @@ Module.register("MMM-Currentweather-MQTT",{
 		spacer2.innerHTML = "&nbsp;&nbsp;&nbsp;&nbsp;";
 
 		var windSpeed = document.createElement("span");
-		if (this.sourceWindSpeed === "OW") {
+		if (this.isRemoteSource(this.sourceWindSpeed)) {
 			windSpeed.className = windSpeed.className + " yellow";
 		}
 		windSpeed.innerHTML = " " + this.windSpeed;
@@ -232,7 +282,7 @@ Module.register("MMM-Currentweather-MQTT",{
 
 		if (this.config.showWindDirection) {
 			var windDirection = document.createElement("sup");
-			if (this.sourceWindDir === "OW") {
+			if (this.isRemoteSource(this.sourceWindDir)) {
 				windDirection.className = windDirection.className + " yellow";
 			}
 	
@@ -256,14 +306,14 @@ Module.register("MMM-Currentweather-MQTT",{
 
 		if (this.config.showHumidity) {
 			var humidity = document.createElement("span");
-			if (this.sourceHum === "OW") {
+			if (this.isRemoteSource(this.sourceHum)) {
 				humidity.className = humidity.className + " yellow";
 			}
 			humidity.innerHTML = this.humidity;
 
 			var humidityIcon = document.createElement("sup");
 			humidityIcon.className = "wi wi-humidity humidityIcon";
-			if (this.sourceHum === "OW") {
+			if (this.isRemoteSource(this.sourceHum)) {
 				humidityIcon.className = humidityIcon.className + " yellow";
 			}
 			humidityIcon.innerHTML = "&nbsp;";
@@ -330,7 +380,7 @@ Module.register("MMM-Currentweather-MQTT",{
 		if (this.config.showRainfall) {
 			var rainfallToday = document.createElement("span");
 			rainfallToday.className = "normal medium";
-			if (this.sourceRainfall === "OW") {
+			if (this.isRemoteSource(this.sourceRainfall)) {
 				rainfallToday.className = rainfallToday.className + " yellow";
 			}
 			if (this.raining === "true") {
@@ -375,7 +425,7 @@ Module.register("MMM-Currentweather-MQTT",{
 
 		var temperature = document.createElement("span");
 		temperature.className = "bright";
-		if (this.sourceTemp === "OW") {
+		if (this.isRemoteSource(this.sourceTemp)) {
 			temperature.className = temperature.className + " yellow";
 		}
 
@@ -590,54 +640,35 @@ Module.register("MMM-Currentweather-MQTT",{
 		}
 
 		sub = this.subscriptions;
-		this.sourceHum = "OW";
-		this.sourceTemp = "OW";
-		this.sourceWindSpeed = "OW";
-		this.sourceWindDir = "OW";
-		this.sourceRainfall = "OW";
+		this.sourceRainfall = "owm";
 
-		if (sub[this.indexHum].value == "" || this.isValueTooOld(sub[this.indexHum].maxAgeSeconds, sub[this.indexHum].time)) {
-			this.humidity = parseFloat(data.main.humidity);
-		} else {
-			this.sourceHum = "MQTT";
-			this.humidity = sub[this.indexHum].value;
-		}
+		var humidity = this.pickValue("humidity", data);
+		this.sourceHum = humidity.source;
+		this.humidity = humidity.value;
 
-		if (sub[this.indexTemp].value == "" || this.isValueTooOld(sub[this.indexTemp].maxAgeSeconds, sub[this.indexTemp].time)) {
-			this.temperature = this.roundValue(data.main.temp);
-		} else {
-			this.sourceTemp = "MQTT";
-			this.temperature = sub[this.indexTemp].value;
-		}
+		var temperature = this.pickValue("temperature", data);
+		this.sourceTemp = temperature.source;
+		this.temperature = this.roundValue(temperature.value);
 
 		this.fetchedLocationName = data.name;
 		this.feelsLike = 0;
 
+		// Every source is normalised to meters per second, the display unit is
+		// applied afterwards.
+		var wind = this.pickValue("windSpeed", data);
+		var windSpeedInMs = WeatherSources.toMetersPerSecond(wind.value, wind.unit);
+		this.sourceWindSpeed = wind.source;
+
 		if (this.config.useBeaufort){
-			if (sub[this.indexWindSpeed].value == "" || this.isValueTooOld(sub[this.indexWindSpeed].maxAgeSeconds, sub[this.indexWindSpeed].time)) {
-				this.windSpeed = this.ms2Beaufort(this.roundValue(data.wind.speed));
-			} else {
-				this.sourceWindSpeed = "MQTT";
-				this.windSpeed = this.ms2Beaufort(this.roundValue(sub[this.indexWindSpeed].value));
-			}
+			this.windSpeed = this.ms2Beaufort(this.roundValue(windSpeedInMs));
 		} else if (this.config.useKMPHwind) {
-			if (sub[this.indexWindSpeed].value == "" || this.isValueTooOld(sub[this.indexWindSpeed].maxAgeSeconds, sub[this.indexWindSpeed].time)) {
-				this.windSpeed = parseFloat((data.wind.speed * 60 * 60) / 1000).toFixed(0);
-			} else {
-				this.sourceWindSpeed = "MQTT";
-				this.windSpeed = parseFloat(sub[this.indexWindSpeed].value).toFixed(0);
-			}
+			this.windSpeed = parseFloat(windSpeedInMs * 3.6).toFixed(0);
 		} else {
-			if (sub[this.indexWindSpeed].value == "" || this.isValueTooOld(sub[this.indexWindSpeed].maxAgeSeconds, sub[this.indexWindSpeed].time)) {
-				this.windSpeed = parseFloat(data.wind.speed).toFixed(0);
-			} else {
-				this.sourceWindSpeed = "MQTT";
-				this.windSpeed = parseFloat((sub[this.indexWindSpeed].value * 1000) / (60*60)).toFixed(0);
-			}
+			this.windSpeed = parseFloat(windSpeedInMs).toFixed(0);
 		}
 
 		// ONLY WORKS IF TEMP IN C //
-		var windInMph = parseFloat(data.wind.speed * 2.23694);
+		var windInMph = parseFloat(windSpeedInMs * 2.23694);
 
 		var tempInF = 0;
 		switch (this.config.units){
@@ -691,45 +722,36 @@ Module.register("MMM-Currentweather-MQTT",{
 			this.feelsLike = parseFloat(this.temperature).toFixed(0);
 		}
 
-		if (sub[this.indexWindDir].value == "" || this.isValueTooOld(sub[this.indexWindDir].maxAgeSeconds, sub[this.indexWindDir].time)) {
-			this.windDirection = this.deg2Cardinal(data.wind.deg);
-		} else {
-			this.sourceWindDir = "MQTT";
-			this.windDirection = this.deg2Cardinal(sub[this.indexWindDir].value);
-		}
-
-		if (sub[this.indexWindDir].value == "" || this.isValueTooOld(sub[this.indexWindDir].maxAgeSeconds, sub[this.indexWindDir].time)) {
-			this.windDeg = data.wind.deg;
-		} else {
-			this.sourceWindDir = "MQTT";
-			this.windDeg = sub[this.indexWindDir].value;
-		}
+		var windDirection = this.pickValue("windDirection", data);
+		this.sourceWindDir = windDirection ? windDirection.source : "owm";
+		this.windDeg = windDirection ? windDirection.value : null;
+		this.windDirection = this.deg2Cardinal(this.windDeg);
 
 		if (sub[this.indexRainfall].value == "" ) {
 			this.rainfall = "-";
 		} else {
-			this.sourceRainfall = "MQTT";
+			this.sourceRainfall = "mqtt";
 			this.rainfall = sub[this.indexRainfall].value;
 		}
 
 		if (sub[this.indexRaining].value == "" ) {
 			this.raining = "false";
 		} else {
-			this.sourceRaining = "MQTT";
+			this.sourceRaining = "mqtt";
 			this.raining = sub[this.indexRaining].value;
 		}
 
 		if (sub[this.indexTempMax].value == "" ) {
 			this.tempMaxToday = 59;
 		} else {
-			this.sourceTempMax = "MQTT";
+			this.sourceTempMax = "mqtt";
 			this.tempMaxToday = sub[this.indexTempMax].value;
 		}
 
 		if (sub[this.indexTempMin].value == "" ) {
 			this.tempMinToday = -59;
 		} else {
-			this.sourceTempMin = "MQTT";
+			this.sourceTempMin = "mqtt";
 			this.tempMinToday = sub[this.indexTempMin].value;
 		}
 
@@ -894,6 +916,91 @@ Module.register("MMM-Currentweather-MQTT",{
 				this.log(this.name + ": MQTT_PAYLOAD - No payload");
 			}
 		}
+
+		if (notification === "WEATHER_SOURCE_DATA") {
+			this.log(this.name, payload);
+			this.externalValues[payload.source] = payload;
+			this.updateWeather(true);
+		}
+	},
+
+	/* Local sensor readings are printed plain, values fetched from a weather
+	 * service are marked yellow.
+	 */
+	isRemoteSource: function(source) {
+		return source !== "mqtt";
+	},
+
+	/* Current reading of every source for one value.
+	 *
+	 * returns Object - source name -> { value, time, maxAgeSeconds, unit }
+	 */
+	sourceCandidates: function(key, data) {
+		var self = this;
+		var candidates = {};
+
+		var mqttIndex = {
+			temperature: this.indexTemp,
+			humidity: this.indexHum,
+			windSpeed: this.indexWindSpeed,
+			windDirection: this.indexWindDir
+		}[key];
+
+		var mqttSub = typeof mqttIndex === "undefined" ? null : this.subscriptions[mqttIndex];
+		if (mqttSub) {
+			candidates.mqtt = {
+				value: mqttSub.value,
+				time: mqttSub.time,
+				maxAgeSeconds: mqttSub.maxAgeSeconds,
+				unit: key === "windSpeed" ? this.config.mqttWindSpeedUnit : undefined
+			};
+		}
+
+		var owmValue = {
+			temperature: data.main.temp,
+			humidity: data.main.humidity,
+			windSpeed: data.wind.speed,
+			windDirection: data.wind.deg
+		}[key];
+
+		if (typeof owmValue !== "undefined") {
+			// Fetched as part of the current request, so it never ages out.
+			candidates.owm = {
+				value: owmValue,
+				time: Date.now(),
+				maxAgeSeconds: 0,
+				unit: key === "windSpeed" && this.config.units === "imperial" ? "mph" : "ms"
+			};
+		}
+
+		["metno", "hass"].forEach(function(name) {
+			var pushed = self.externalValues[name];
+			if (!pushed || typeof pushed.values[key] === "undefined") {
+				return;
+			}
+			candidates[name] = {
+				value: pushed.values[key],
+				time: pushed.time,
+				maxAgeSeconds: self.config[name].maxAgeSeconds,
+				unit: pushed.units ? pushed.units[key] : undefined
+			};
+		});
+
+		return candidates;
+	},
+
+	/* Value for one key, following the configured source priority.
+	 * Falls back to OpenWeatherMap when none of the configured sources has a
+	 * value, so a silent sensor never blanks the display.
+	 */
+	pickValue: function(key, data) {
+		var candidates = this.sourceCandidates(key, data);
+		var picked = WeatherSources.resolve(this.config.sources[key], candidates);
+		if (!picked) {
+			picked = WeatherSources.resolve(["owm"], candidates);
+			this.log(this.name + ": no configured source for " + key + ", using owm");
+		}
+		return picked;
 	},
 
 	isValueTooOld: function(maxAgeSeconds, updatedTime) {

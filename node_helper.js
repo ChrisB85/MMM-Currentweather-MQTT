@@ -14,6 +14,148 @@ module.exports = NodeHelper.create({
 	start: function () {
 		console.log(this.name + ': Starting node helper');
 		this.loaded = false;
+		this.pollers = [];
+		this.metnoPayload = null;
+	},
+
+	/* Weather sources fetched over HTTP. They live here and not in the module
+	 * because met.no requires an identifying User-Agent, a header the browser
+	 * refuses to let a page set.
+	 */
+	startSourcePollers: function (config) {
+		var self = this;
+
+		this.pollers.forEach(clearInterval);
+		this.pollers = [];
+
+		if (config.metno && config.metno.lat !== null && config.metno.lon !== null) {
+			if (config.metno.userAgent) {
+				this.addPoller(config.metno.updateInterval, function () {
+					return self.fetchMetno(config.metno);
+				});
+			} else {
+				console.log(self.name + ': met.no needs metno.userAgent with a contact address, source disabled');
+			}
+		}
+
+		if (config.hass && config.hass.token && Object.keys(config.hass.entities || {}).length > 0) {
+			this.addPoller(config.hass.updateInterval, function () {
+				return self.fetchHass(config.hass);
+			});
+		}
+	},
+
+	addPoller: function (interval, fetcher) {
+		var self = this;
+		var run = function () {
+			fetcher().catch(function (err) {
+				console.log(self.name + ': ' + err.message);
+			});
+		};
+
+		run();
+		this.pollers.push(setInterval(run, interval));
+	},
+
+	/* MET Norway (yr.no), the API behind Home Assistant's met.no integration.
+	 * Their terms of service ask for a contact in the User-Agent and for
+	 * conditional requests, hence If-Modified-Since.
+	 */
+	fetchMetno: async function (config) {
+		var headers = { 'User-Agent': config.userAgent };
+		if (this.metnoLastModified) {
+			headers['If-Modified-Since'] = this.metnoLastModified;
+		}
+
+		var response = await fetch(
+			'https://api.met.no/weatherapi/locationforecast/2.0/compact?lat=' + config.lat + '&lon=' + config.lon,
+			{ headers: headers, signal: AbortSignal.timeout(10000) }
+		);
+
+		// 304: the forecast we already have is still the current one. Resend it
+		// so the module sees a fresh timestamp instead of ageing it out.
+		if (response.status === 304 && this.metnoPayload) {
+			this.metnoPayload.time = Date.now();
+			this.sendSocketNotification('WEATHER_SOURCE_DATA', this.metnoPayload);
+			return;
+		}
+
+		if (!response.ok) {
+			throw new Error('met.no returned HTTP ' + response.status);
+		}
+
+		this.metnoLastModified = response.headers.get('last-modified');
+
+		var body = await response.json();
+		var details = body.properties.timeseries[0].data.instant.details;
+
+		this.metnoPayload = {
+			source: 'metno',
+			time: Date.now(),
+			values: {
+				temperature: details.air_temperature,
+				humidity: details.relative_humidity,
+				windSpeed: details.wind_speed,
+				windDirection: details.wind_from_direction
+			},
+			units: { windSpeed: 'ms' }
+		};
+
+		this.log('met.no', this.metnoPayload.values);
+		this.sendSocketNotification('WEATHER_SOURCE_DATA', this.metnoPayload);
+	},
+
+	/* Home Assistant REST API. Reading the values from Home Assistant keeps the
+	 * mirror showing the same numbers Home Assistant does.
+	 */
+	fetchHass: async function (config) {
+		var base = (config.useTLS ? 'https://' : 'http://') + config.host + ':' + config.port;
+		var values = {};
+		var units = {};
+
+		for (var key of Object.keys(config.entities)) {
+			var entity = config.entities[key];
+
+			try {
+				var response = await fetch(base + '/api/states/' + entity.entity, {
+					headers: { Authorization: 'Bearer ' + config.token },
+					signal: AbortSignal.timeout(10000)
+				});
+
+				if (!response.ok) {
+					throw new Error('HTTP ' + response.status);
+				}
+
+				var state = await response.json();
+				var value = entity.attribute ? state.attributes[entity.attribute] : state.state;
+
+				// What Home Assistant reports while an integration is down.
+				if (value === null || typeof value === 'undefined' || value === 'unavailable' || value === 'unknown') {
+					continue;
+				}
+
+				values[key] = value;
+				if (entity.unit) {
+					units[key] = entity.unit;
+				}
+			} catch (err) {
+				console.log(this.name + ': Home Assistant ' + entity.entity + ': ' + err.message);
+			}
+		}
+
+		// Nothing readable: stay quiet and let the values age out, so the module
+		// falls through to the next source.
+		if (Object.keys(values).length === 0) {
+			return;
+		}
+
+		this.log('Home Assistant', values);
+		this.sendSocketNotification('WEATHER_SOURCE_DATA', {
+			source: 'hass',
+			time: Date.now(),
+			values: values,
+			units: units
+		});
 	},
 
 	makeServerKey: function (server) {
@@ -101,6 +243,10 @@ module.exports = NodeHelper.create({
 			var config = payload;
 			self.addConfig(config);
 			self.loaded = true;
+		}
+		if (notification === 'WEATHER_SOURCE_CONFIG') {
+			self.config = payload;
+			self.startSourcePollers(payload);
 		}
 	},
 });
