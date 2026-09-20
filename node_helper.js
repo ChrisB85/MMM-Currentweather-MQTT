@@ -129,6 +129,12 @@ module.exports = NodeHelper.create({
 				var state = await response.json();
 				var value = entity.attribute ? state.attributes[entity.attribute] : state.state;
 
+				// Timestamp entities (Sun2 rising and setting) come as ISO 8601
+				// strings. The module works in epoch milliseconds.
+				if (typeof value === 'string' && /^\d{4}-\d{2}-\d{2}T/.test(value)) {
+					value = Date.parse(value);
+				}
+
 				// What Home Assistant reports while an integration is down.
 				if (value === null || typeof value === 'undefined' || value === 'unavailable' || value === 'unknown') {
 					continue;

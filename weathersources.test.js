@@ -51,7 +51,11 @@ let definition;
 global.Module = { register: (name, def) => { definition = def; } };
 require("./MMM-Currentweather-MQTT.js");
 
-const owmData = { main: { temp: 12, humidity: 80 }, wind: { speed: 5, deg: 180 } };
+const owmData = {
+	main: { temp: 12, humidity: 80 },
+	wind: { speed: 5, deg: 180 },
+	sys: { sunrise: 1789529457, sunset: 1789573957 }   // epoch seconds, as OpenWeatherMap sends them
+};
 
 function mirror(overrides) {
 	const module = Object.create(definition);
@@ -103,5 +107,23 @@ const temp = mirror();
 temp.subscriptions[temp.indexTemp] = { value: "8.4", time: Date.now(), maxAgeSeconds: 18000 };
 temp.externalValues.hass = { time: Date.now(), values: { temperature: 11.2 } };
 assert.deepStrictEqual(temp.pickValue("temperature", owmData), { source: "mqtt", value: 8.4, unit: undefined });
+
+// Sun times: OpenWeatherMap sends epoch seconds, Home Assistant epoch
+// milliseconds (node_helper parses the ISO timestamp), both end up in ms.
+const sun = mirror();
+assert.deepStrictEqual(
+	new Date(sun.pickValue("sunrise", owmData).value).toISOString(),
+	new Date(owmData.sys.sunrise * 1000).toISOString()
+);
+
+sun.config.sources.sunrise = ["hass", "owm"];
+sun.config.sources.sunset = ["hass", "owm"];
+sun.externalValues.hass = { time: Date.now(), values: { sunrise: Date.parse("2026-09-20T04:29:08+00:00") } };
+const hassSunrise = sun.pickValue("sunrise", owmData);
+assert.strictEqual(hassSunrise.source, "hass");
+assert.strictEqual(new Date(hassSunrise.value).toISOString(), "2026-09-20T04:29:08.000Z");
+
+// Sunset was not among the Home Assistant entities, so it stays on OpenWeatherMap.
+assert.strictEqual(sun.pickValue("sunset", owmData).source, "owm");
 
 console.log("module wiring: all checks passed");

@@ -80,7 +80,9 @@ Module.register("MMM-Currentweather-MQTT",{
 			temperature: ["mqtt", "owm"],
 			humidity: ["mqtt", "owm"],
 			windSpeed: ["mqtt", "owm"],
-			windDirection: ["mqtt", "owm"]
+			windDirection: ["mqtt", "owm"],
+			sunrise: ["owm"],
+			sunset: ["owm"]
 		},
 
 		// Unit the MQTT wind speed topic publishes in: "kmh", "ms", "mph" or "kn".
@@ -131,6 +133,8 @@ Module.register("MMM-Currentweather-MQTT",{
 	sourceRainfall: "owm",
 	sourceTempMax: "mqtt",
 	sourceTempMin: "mqtt",
+	sourceSunrise: "owm",
+	sourceSunset: "owm",
 
 
 
@@ -758,8 +762,12 @@ Module.register("MMM-Currentweather-MQTT",{
 		this.weatherType = this.config.iconTable[data.weather[0].icon];
 
 		var now = new Date();
-		var sunrise = new Date(data.sys.sunrise * 1000);
-		var sunset = new Date(data.sys.sunset * 1000);
+		var sunriseValue = this.pickValue("sunrise", data);
+		var sunsetValue = this.pickValue("sunset", data);
+		this.sourceSunrise = sunriseValue.source;
+		this.sourceSunset = sunsetValue.source;
+		var sunrise = new Date(sunriseValue.value);
+		var sunset = new Date(sunsetValue.value);
 
 		// The moment().format('h') method has a bug on the Raspberry Pi.
 		// So we need to generate the timestring manually.
@@ -960,7 +968,10 @@ Module.register("MMM-Currentweather-MQTT",{
 			temperature: data.main.temp,
 			humidity: data.main.humidity,
 			windSpeed: data.wind.speed,
-			windDirection: data.wind.deg
+			windDirection: data.wind.deg,
+			// Sun times are epoch milliseconds, whatever the source.
+			sunrise: data.sys.sunrise * 1000,
+			sunset: data.sys.sunset * 1000
 		}[key];
 
 		if (typeof owmValue !== "undefined") {

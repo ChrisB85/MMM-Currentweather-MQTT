@@ -195,6 +195,8 @@ sources: {
     humidity:      ["mqtt", "owm"],
     windSpeed:     ["hass", "metno", "owm"],   // no wind sensor here
     windDirection: ["hass", "metno", "owm"],
+    sunrise:       ["hass", "owm"],
+    sunset:        ["hass", "owm"],
 },
 ```
 
@@ -241,6 +243,8 @@ hass: {
     entities: {
         windSpeed:     { entity: "weather.forecast_home", attribute: "wind_speed", unit: "kmh" },
         windDirection: { entity: "weather.forecast_home", attribute: "wind_bearing" },
+        sunrise:       { entity: "sensor.home_sun_rising" },
+        sunset:        { entity: "sensor.home_sun_setting" },
     },
 },
 ```
@@ -248,3 +252,8 @@ hass: {
 Each entry reads one entity attribute, or the entity state when `attribute` is
 omitted. Entities reporting `unavailable` or `unknown` are skipped. Without a
 `token` or with an empty `entities` map the source stays disabled.
+
+Entities holding a timestamp, such as the Sun2 rising and setting sensors, are
+parsed from ISO 8601 into epoch milliseconds, which is what `sunrise` and
+`sunset` expect. Use the sensors holding *today's* times, not the `next_*` ones:
+the module decides on its own whether to display the sunrise or the sunset.
