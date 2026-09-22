@@ -51,6 +51,12 @@
   padding-right: 4px;
 }
 
+/* The gap between a value and the unit or marker that follows it, the same
+ * one for wind, humidity and pressure. */
+.MMM-Currentweather-MQTT .unit {
+  padding-left: 5px;
+}
+
 .MMM-Currentweather-MQTT .humidity-padding {
   padding-bottom: 6px;
 }

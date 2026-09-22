@@ -282,19 +282,16 @@ Module.register("MMM-Currentweather-MQTT",{
 		small.appendChild(windIcon);
 		small.appendChild(spacer1);
 
-		var spacer2 = document.createElement("sup");
-		spacer2.innerHTML = "&nbsp;&nbsp;&nbsp;&nbsp;";
-
 		var windSpeed = document.createElement("span");
 		if (this.isRemoteSource(this.sourceWindSpeed)) {
 			windSpeed.className = windSpeed.className + " yellow";
 		}
 		windSpeed.innerHTML = " " + this.windSpeed;
 		small.appendChild(windSpeed);
-		small.appendChild(spacer2);
 
 		if (this.config.showWindDirection) {
 			var windDirection = document.createElement("sup");
+			windDirection.className = "unit";
 			if (this.isRemoteSource(this.sourceWindDir)) {
 				windDirection.className = windDirection.className + " yellow";
 			}
@@ -325,21 +322,18 @@ Module.register("MMM-Currentweather-MQTT",{
 			humidity.innerHTML = this.humidity;
 
 			var humidityIcon = document.createElement("sup");
-			humidityIcon.className = "wi wi-humidity humidityIcon";
+			humidityIcon.className = "wi wi-humidity humidityIcon unit";
 			if (this.isRemoteSource(this.sourceHum)) {
 				humidityIcon.className = humidityIcon.className + " yellow";
 			}
 			humidityIcon.innerHTML = "&nbsp;";
 
-			var spacer4 = document.createElement("sup");
-			spacer4.innerHTML = "&nbsp;";
 			var spacer5 = document.createElement("sup");
 			spacer5.innerHTML = "&nbsp;&nbsp;&nbsp;&nbsp;";
 
 	
 	
 			small.appendChild(humidity);
-			small.appendChild(spacer4);
 			small.appendChild(humidityIcon);
 			small.appendChild(spacer5);
 		}
@@ -358,8 +352,9 @@ Module.register("MMM-Currentweather-MQTT",{
 
 			// The unit rides raised and small, the way the humidity sign does.
 			var pressureUnit = document.createElement("sup");
+			pressureUnit.className = "unit";
 			if (this.isStationPressure(this.sourcePressure) === false) {
-				pressureUnit.className = "yellow";
+				pressureUnit.className = pressureUnit.className + " yellow";
 			}
 			pressureUnit.innerHTML = "hPa";
 			small.appendChild(pressureUnit);
