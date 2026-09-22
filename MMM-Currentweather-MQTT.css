@@ -57,6 +57,12 @@
   padding-left: 5px;
 }
 
+/* Icon glyphs bring a left side bearing of their own, plain text does not, so
+ * a written unit needs less padding to sit the same distance from its value. */
+.MMM-Currentweather-MQTT .unit-text {
+  padding-left: 3px;
+}
+
 .MMM-Currentweather-MQTT .humidity-padding {
   padding-bottom: 6px;
 }

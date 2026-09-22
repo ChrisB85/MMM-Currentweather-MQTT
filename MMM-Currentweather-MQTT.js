@@ -352,7 +352,7 @@ Module.register("MMM-Currentweather-MQTT",{
 
 			// The unit rides raised and small, the way the humidity sign does.
 			var pressureUnit = document.createElement("sup");
-			pressureUnit.className = "unit";
+			pressureUnit.className = "unit unit-text";
 			if (this.isStationPressure(this.sourcePressure) === false) {
 				pressureUnit.className = pressureUnit.className + " yellow";
 			}
