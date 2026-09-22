@@ -96,7 +96,8 @@ module.exports = NodeHelper.create({
 				temperature: details.air_temperature,
 				humidity: details.relative_humidity,
 				windSpeed: details.wind_speed,
-				windDirection: details.wind_from_direction
+				windDirection: details.wind_from_direction,
+				pressure: details.air_pressure_at_sea_level
 			},
 			units: { windSpeed: 'ms' }
 		};

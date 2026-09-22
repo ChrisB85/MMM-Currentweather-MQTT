@@ -29,6 +29,7 @@ Module.register("MMM-Currentweather-MQTT",{
 		lang: config.language,
 		decimalSymbol: ".",
 		showHumidity: false,
+		showPressure: false,
 		degreeLabel: false,
 		showIndoorTemperature: false,
 		showIndoorHumidity: false,
@@ -81,12 +82,18 @@ Module.register("MMM-Currentweather-MQTT",{
 			humidity: ["mqtt", "owm"],
 			windSpeed: ["mqtt", "owm"],
 			windDirection: ["mqtt", "owm"],
+			pressure: ["hass", "owm"],
 			sunrise: ["owm"],
 			sunset: ["owm"]
 		},
 
 		// Unit the MQTT wind speed topic publishes in: "kmh", "ms", "mph" or "kn".
 		mqttWindSpeedUnit: "kmh",
+
+		// Height of the local pressure sensor above sea level, in meters. Local
+		// sensors read station pressure, weather services report it reduced to sea
+		// level; this reduces the local reading to the same scale. 0 shows it raw.
+		pressureAltitude: 0,
 
 		// MET Norway (yr.no) - the API behind Home Assistant's met.no integration.
 		metno: {
@@ -129,6 +136,7 @@ Module.register("MMM-Currentweather-MQTT",{
 	sourceTemp: "owm",
 	sourceWindSpeed: "owm",
 	sourceWindDir: "owm",
+	sourcePressure: "owm",
 	sourceRaining: "owm",
 	sourceRainfall: "owm",
 	sourceTempMax: "mqtt",
@@ -235,6 +243,7 @@ Module.register("MMM-Currentweather-MQTT",{
 		this.sunriseSunsetTime = null;
 		this.sunriseSunsetIcon = null;
 		this.temperature = null;
+		this.pressure = null;
 		this.indoorTemperature = null;
 		this.indoorHumidity = null;
 		this.weatherType = null;
@@ -333,6 +342,23 @@ Module.register("MMM-Currentweather-MQTT",{
 			small.appendChild(spacer4);
 			small.appendChild(humidityIcon);
 			small.appendChild(spacer5);
+		}
+
+		if (this.config.showPressure && this.pressure !== null) {
+			var pressureIcon = document.createElement("span");
+			pressureIcon.className = "wi wi-barometer dimmed";
+			small.appendChild(pressureIcon);
+
+			var pressure = document.createElement("span");
+			if (this.isStationPressure(this.sourcePressure) === false) {
+				pressure.className = "yellow";
+			}
+			pressure.innerHTML = " " + this.pressure + " hPa";
+			small.appendChild(pressure);
+
+			var spacer6 = document.createElement("sup");
+			spacer6.innerHTML = "&nbsp;&nbsp;&nbsp;&nbsp;";
+			small.appendChild(spacer6);
 		}
 
 		var sunriseSunsetIcon = document.createElement("span");
@@ -654,6 +680,10 @@ Module.register("MMM-Currentweather-MQTT",{
 		this.sourceTemp = temperature.source;
 		this.temperature = this.roundValue(temperature.value);
 
+		var pressure = this.pickValue("pressure", data);
+		this.sourcePressure = pressure.source;
+		this.pressure = Math.round(this.pressureAtSeaLevel(pressure));
+
 		this.fetchedLocationName = data.name;
 		this.feelsLike = 0;
 
@@ -939,6 +969,36 @@ Module.register("MMM-Currentweather-MQTT",{
 		return source !== "mqtt";
 	},
 
+	/* Sources reading the pressure where the sensor hangs. met.no and
+	 * OpenWeatherMap already report it reduced to sea level. Home Assistant is
+	 * here because the entity the mirror reads is a local sensor - a weather
+	 * integration entity would need pressureAltitude 0.
+	 */
+	isStationPressure: function(source) {
+		return source === "mqtt" || source === "hass";
+	},
+
+	/* Pressure on the scale weather forecasts use, reducing a local reading. */
+	pressureAtSeaLevel: function(picked) {
+		if (!this.isStationPressure(picked.source)) {
+			return parseFloat(picked.value);
+		}
+		return WeatherSources.toSeaLevel(picked.value, this.config.pressureAltitude, this.temperatureInC());
+	},
+
+	/* this.temperature follows config.units, the barometric formula needs Celsius. */
+	temperatureInC: function() {
+		var value = parseFloat(this.temperature);
+		switch (this.config.units) {
+		case "imperial":
+			return (value - 32) * 5 / 9;
+		case "default":
+			return value - 273.15;
+		default:
+			return value;
+		}
+	},
+
 	/* Current reading of every source for one value.
 	 *
 	 * returns Object - source name -> { value, time, maxAgeSeconds, unit }
@@ -969,6 +1029,7 @@ Module.register("MMM-Currentweather-MQTT",{
 			humidity: data.main.humidity,
 			windSpeed: data.wind.speed,
 			windDirection: data.wind.deg,
+			pressure: data.main.pressure,
 			// Sun times are epoch milliseconds, whatever the source.
 			sunrise: data.sys.sunrise * 1000,
 			sunset: data.sys.sunset * 1000

@@ -1,3 +1,42 @@
+@font-face {
+  font-family: 'weathericons';
+  src: url('./fonts/weathericons-regular-webfont.woff2') format('woff2');
+  font-weight: normal;
+  font-style: normal;
+}
+
+.wi {
+  display: inline-block;
+  font-family: 'weathericons';
+  font-style: normal;
+  font-weight: normal;
+  line-height: 1;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+.wi-day-sunny:before { content: "\f00d"; }
+.wi-day-cloudy:before { content: "\f002"; }
+.wi-cloudy:before { content: "\f013"; }
+.wi-cloudy-windy:before { content: "\f011"; }
+.wi-showers:before { content: "\f01a"; }
+.wi-rain:before { content: "\f019"; }
+.wi-thunderstorm:before { content: "\f01e"; }
+.wi-snow:before { content: "\f01b"; }
+.wi-fog:before { content: "\f014"; }
+.wi-night-clear:before { content: "\f02e"; }
+.wi-night-cloudy:before { content: "\f086"; }
+.wi-night-showers:before { content: "\f029"; }
+.wi-night-rain:before { content: "\f028"; }
+.wi-night-thunderstorm:before { content: "\f02c"; }
+.wi-night-snow:before { content: "\f02a"; }
+.wi-night-alt-cloudy-windy:before { content: "\f023"; }
+.wi-strong-wind:before { content: "\f050"; }
+.wi-humidity:before { content: "\f07a"; }
+.wi-barometer:before { content: "\f079"; }
+.wi-sunset:before { content: "\f052"; }
+.wi-sunrise:before { content: "\f051"; }
+
 .MMM-Currentweather-MQTT .weathericon,
 .MMM-Currentweather-MQTT .fa-home {
   font-size: 75%;

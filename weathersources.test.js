@@ -1,7 +1,7 @@
 /* Self-check for the source resolver: node weathersources.test.js */
 
 const assert = require("assert");
-const { resolve, toMetersPerSecond } = require("./weathersources.js");
+const { resolve, toMetersPerSecond, toSeaLevel } = require("./weathersources.js");
 
 const NOW = 1_000_000_000_000;
 const fresh = (value, unit) => ({ value, time: NOW - 60_000, maxAgeSeconds: 1800, unit });
@@ -39,6 +39,13 @@ assert.strictEqual(toMetersPerSecond(5, "ms"), 5);
 assert.strictEqual(toMetersPerSecond(5, undefined), 5);
 assert.throws(() => toMetersPerSecond(5, "furlongs"), /Unknown wind speed unit/);
 
+// Station pressure reduced to sea level: the balcony sensor at 155 m, 12 degrees.
+assert.strictEqual(toSeaLevel(1000.67, 155, 12).toFixed(1), "1019.4");
+// Colder air is denser, so the same reading reduces to a bit more.
+assert.ok(toSeaLevel(1000.67, 155, -5) > toSeaLevel(1000.67, 155, 12));
+// No altitude: the value is already at sea level, hands it back untouched.
+assert.strictEqual(toSeaLevel(1013.2, 0, 12), 1013.2);
+
 console.log("weathersources: all checks passed");
 
 // --- the module wiring: candidate building and unit normalisation ----------
@@ -52,7 +59,7 @@ global.Module = { register: (name, def) => { definition = def; } };
 require("./MMM-Currentweather-MQTT.js");
 
 const owmData = {
-	main: { temp: 12, humidity: 80 },
+	main: { temp: 12, humidity: 80, pressure: 1015 },
 	wind: { speed: 5, deg: 180 },
 	sys: { sunrise: 1789529457, sunset: 1789573957 }   // epoch seconds, as OpenWeatherMap sends them
 };
@@ -125,5 +132,38 @@ assert.strictEqual(new Date(hassSunrise.value).toISOString(), "2026-09-20T04:29:
 
 // Sunset was not among the Home Assistant entities, so it stays on OpenWeatherMap.
 assert.strictEqual(sun.pickValue("sunset", owmData).source, "owm");
+
+// Pressure: the Home Assistant sensor reads station pressure and gets reduced,
+// the fallbacks report sea level already and must not be touched twice.
+const press = mirror();
+press.config.sources.pressure = ["hass", "metno", "owm"];
+press.config.pressureAltitude = 155;
+press.temperature = "12";
+press.externalValues.hass = { time: Date.now(), values: { pressure: 1000.67 } };
+press.externalValues.metno = { time: Date.now(), values: { pressure: 1022.6 } };
+const hassPressure = press.pickValue("pressure", owmData);
+assert.strictEqual(hassPressure.source, "hass");
+assert.strictEqual(press.pressureAtSeaLevel(hassPressure).toFixed(1), "1019.4");
+
+// Sensor unreachable: met.no steps in, already at sea level.
+press.externalValues.hass.time = Date.now() - 2 * 3600 * 1000;
+const metnoPressure = press.pickValue("pressure", owmData);
+assert.strictEqual(metnoPressure.source, "metno");
+assert.strictEqual(press.pressureAtSeaLevel(metnoPressure), 1022.6);
+
+// Both remote sources gone: OpenWeatherMap, also sea level.
+delete press.externalValues.metno;
+assert.deepStrictEqual(press.pickValue("pressure", owmData), { source: "owm", value: 1015, unit: "ms" });
+assert.strictEqual(press.pressureAtSeaLevel(press.pickValue("pressure", owmData)), 1015);
+
+// Fahrenheit and Kelvin reach the formula as Celsius.
+const imperial = mirror();
+imperial.config.units = "imperial";
+imperial.temperature = "53.6";
+assert.strictEqual(imperial.temperatureInC().toFixed(1), "12.0");
+const kelvin = mirror();
+kelvin.config.units = "default";
+kelvin.temperature = "285.15";
+assert.strictEqual(kelvin.temperatureInC().toFixed(1), "12.0");
 
 console.log("module wiring: all checks passed");

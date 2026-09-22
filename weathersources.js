@@ -53,6 +53,26 @@
 		return candidate.time + candidate.maxAgeSeconds * 1000 < now;
 	}
 
+	/* Station pressure reduced to sea level, the scale weather services report.
+	 * A sensor reads the pressure where it hangs, some 18 hPa low at 155 m, so
+	 * without this the mirror would show a permanent deep low.
+	 *
+	 * altitude 0 returns the reading untouched, for sources that already
+	 * reduced it (met.no, OpenWeatherMap).
+	 *
+	 * pressure     - station pressure, any unit (the result keeps it)
+	 * altitude     - sensor height above sea level in meters
+	 * temperatureC - current temperature in degrees Celsius
+	 */
+	function toSeaLevel(pressure, altitude, temperatureC) {
+		var value = parseFloat(pressure);
+		if (!altitude) {
+			return value;
+		}
+		var lapse = 0.0065 * altitude;
+		return value * Math.pow(1 - lapse / (parseFloat(temperatureC) + lapse + 273.15), -5.257);
+	}
+
 	/* priority   - array of source names, most wanted first
 	 * candidates - map source name -> { value, time, maxAgeSeconds, unit }
 	 * returns    - { source, value, unit } or null when no source has a value
@@ -78,6 +98,7 @@
 	var api = {
 		resolve: resolve,
 		toMetersPerSecond: toMetersPerSecond,
+		toSeaLevel: toSeaLevel,
 		WIND_SPEED_TO_MS: WIND_SPEED_TO_MS
 	};
 
