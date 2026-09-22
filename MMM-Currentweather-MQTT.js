@@ -353,8 +353,16 @@ Module.register("MMM-Currentweather-MQTT",{
 			if (this.isStationPressure(this.sourcePressure) === false) {
 				pressure.className = "yellow";
 			}
-			pressure.innerHTML = " " + this.pressure + " hPa";
+			pressure.innerHTML = " " + this.pressure;
 			small.appendChild(pressure);
+
+			// The unit rides raised and small, the way the humidity sign does.
+			var pressureUnit = document.createElement("sup");
+			if (this.isStationPressure(this.sourcePressure) === false) {
+				pressureUnit.className = "yellow";
+			}
+			pressureUnit.innerHTML = "hPa";
+			small.appendChild(pressureUnit);
 
 			var spacer6 = document.createElement("sup");
 			spacer6.innerHTML = "&nbsp;&nbsp;&nbsp;&nbsp;";
