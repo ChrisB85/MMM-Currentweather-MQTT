@@ -205,7 +205,7 @@ module.exports = NodeHelper.create({
 
 	startClient: function (server) {
 
-		console.log(this.name + ': Starting client for: ', server);
+		console.log(this.name + ": Starting client for: ", server.address);
 
 		var self = this;
 
