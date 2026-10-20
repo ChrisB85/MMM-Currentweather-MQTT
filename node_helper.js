@@ -1,5 +1,6 @@
 const mqtt = require('mqtt');
 const NodeHelper = require("node_helper");
+const WeatherSources = require("./weathersources.js");
 
 var servers = [];
 
@@ -67,8 +68,9 @@ module.exports = NodeHelper.create({
 			headers['If-Modified-Since'] = this.metnoLastModified;
 		}
 
+		// complete, not compact: only the complete forecast carries the UV index.
 		var response = await fetch(
-			'https://api.met.no/weatherapi/locationforecast/2.0/compact?lat=' + config.lat + '&lon=' + config.lon,
+			'https://api.met.no/weatherapi/locationforecast/2.0/complete?lat=' + config.lat + '&lon=' + config.lon,
 			{ headers: headers, signal: AbortSignal.timeout(10000) }
 		);
 
@@ -92,13 +94,7 @@ module.exports = NodeHelper.create({
 		this.metnoPayload = {
 			source: 'metno',
 			time: Date.now(),
-			values: {
-				temperature: details.air_temperature,
-				humidity: details.relative_humidity,
-				windSpeed: details.wind_speed,
-				windDirection: details.wind_from_direction,
-				pressure: details.air_pressure_at_sea_level
-			},
+			values: WeatherSources.metnoValues(details),
 			units: { windSpeed: 'ms' }
 		};
 

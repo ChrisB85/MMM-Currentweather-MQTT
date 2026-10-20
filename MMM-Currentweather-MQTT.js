@@ -30,6 +30,7 @@ Module.register("MMM-Currentweather-MQTT",{
 		decimalSymbol: ".",
 		showHumidity: false,
 		showPressure: false,
+		showUVIndex: false,
 		degreeLabel: false,
 		showIndoorTemperature: false,
 		showIndoorHumidity: false,
@@ -84,7 +85,10 @@ Module.register("MMM-Currentweather-MQTT",{
 			windDirection: ["mqtt", "owm"],
 			pressure: ["hass", "owm"],
 			sunrise: ["owm"],
-			sunset: ["owm"]
+			sunset: ["owm"],
+			// OpenWeatherMap's current weather has no UV index, so there is no
+			// fallback: without a source the UV index is left out.
+			uvIndex: ["metno"]
 		},
 
 		// Unit the MQTT wind speed topic publishes in: "kmh", "ms", "mph" or "kn".
@@ -244,6 +248,7 @@ Module.register("MMM-Currentweather-MQTT",{
 		this.sunriseSunsetIcon = null;
 		this.temperature = null;
 		this.pressure = null;
+		this.uvIndex = null;
 		this.indoorTemperature = null;
 		this.indoorHumidity = null;
 		this.weatherType = null;
@@ -362,6 +367,23 @@ Module.register("MMM-Currentweather-MQTT",{
 			var spacer6 = document.createElement("sup");
 			spacer6.innerHTML = "&nbsp;&nbsp;&nbsp;&nbsp;";
 			small.appendChild(spacer6);
+		}
+
+		if (this.config.showUVIndex && this.uvIndex !== null) {
+			// No local UV sensor exists, so the value is always a remote one.
+			var uvLabel = document.createElement("span");
+			uvLabel.className = "dimmed";
+			uvLabel.innerHTML = "UV";
+			small.appendChild(uvLabel);
+
+			var uvIndex = document.createElement("span");
+			uvIndex.className = "yellow";
+			uvIndex.innerHTML = " " + this.uvIndex;
+			small.appendChild(uvIndex);
+
+			var spacer7 = document.createElement("sup");
+			spacer7.innerHTML = "&nbsp;&nbsp;&nbsp;&nbsp;";
+			small.appendChild(spacer7);
 		}
 
 		var sunriseSunsetIcon = document.createElement("span");
@@ -686,6 +708,8 @@ Module.register("MMM-Currentweather-MQTT",{
 		var pressure = this.pickValue("pressure", data);
 		this.sourcePressure = pressure.source;
 		this.pressure = Math.round(this.pressureAtSeaLevel(pressure));
+
+		this.uvIndex = this.uvIndexValue(data);
 
 		this.fetchedLocationName = data.name;
 		this.feelsLike = 0;
@@ -1076,6 +1100,15 @@ Module.register("MMM-Currentweather-MQTT",{
 			this.log(this.name + ": no configured source for " + key + ", using owm");
 		}
 		return picked;
+	},
+
+	/* UV index rounded to a whole number, the way it is reported, or null
+	 * when no configured source has one. Unlike pickValue there is no
+	 * OpenWeatherMap fallback: its current weather carries no UV index.
+	 */
+	uvIndexValue: function(data) {
+		var picked = WeatherSources.resolve(this.config.sources.uvIndex, this.sourceCandidates("uvIndex", data));
+		return picked ? Math.round(picked.value) : null;
 	},
 
 	isValueTooOld: function(maxAgeSeconds, updatedTime) {

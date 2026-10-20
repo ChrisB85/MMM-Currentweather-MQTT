@@ -1,7 +1,7 @@
 /* Self-check for the source resolver: node weathersources.test.js */
 
 const assert = require("assert");
-const { resolve, toMetersPerSecond, toSeaLevel } = require("./weathersources.js");
+const { resolve, toMetersPerSecond, toSeaLevel, metnoValues } = require("./weathersources.js");
 
 const NOW = 1_000_000_000_000;
 const fresh = (value, unit) => ({ value, time: NOW - 60_000, maxAgeSeconds: 1800, unit });
@@ -45,6 +45,28 @@ assert.strictEqual(toSeaLevel(1000.67, 155, 12).toFixed(1), "1019.4");
 assert.ok(toSeaLevel(1000.67, 155, -5) > toSeaLevel(1000.67, 155, 12));
 // No altitude: the value is already at sea level, hands it back untouched.
 assert.strictEqual(toSeaLevel(1013.2, 0, 12), 1013.2);
+
+// met.no instant details mapped onto the module's value keys. The UV index is
+// only in the complete forecast, as the clear sky value.
+const metnoDetails = {
+	air_temperature: 11.6,
+	relative_humidity: 72.7,
+	wind_speed: 3.6,
+	wind_from_direction: 123,
+	air_pressure_at_sea_level: 1021.5,
+	ultraviolet_index_clear_sky: 1.9
+};
+assert.deepStrictEqual(metnoValues(metnoDetails), {
+	temperature: 11.6,
+	humidity: 72.7,
+	windSpeed: 3.6,
+	windDirection: 123,
+	pressure: 1021.5,
+	uvIndex: 1.9
+});
+// The compact forecast has no UV index: the key stays undefined, not 0.
+delete metnoDetails.ultraviolet_index_clear_sky;
+assert.strictEqual(metnoValues(metnoDetails).uvIndex, undefined);
 
 console.log("weathersources: all checks passed");
 
@@ -165,5 +187,17 @@ const kelvin = mirror();
 kelvin.config.units = "default";
 kelvin.temperature = "285.15";
 assert.strictEqual(kelvin.temperatureInC().toFixed(1), "12.0");
+
+// UV index: met.no by default, rounded the way the index is reported.
+const uv = mirror();
+assert.strictEqual(uv.uvIndexValue(owmData), null);
+uv.externalValues.metno = { time: Date.now(), values: { uvIndex: 1.9 } };
+assert.strictEqual(uv.uvIndexValue(owmData), 2);
+// Night: 0 is a real reading, not a missing one.
+uv.externalValues.metno.values.uvIndex = 0;
+assert.strictEqual(uv.uvIndexValue(owmData), 0);
+// met.no gone too long: no UV at all. OpenWeatherMap has none to fall back on.
+uv.externalValues.metno = { time: Date.now() - 2 * 3600 * 1000, values: { uvIndex: 5 } };
+assert.strictEqual(uv.uvIndexValue(owmData), null);
 
 console.log("module wiring: all checks passed");

@@ -212,6 +212,15 @@ m/s while the other display modes treated it as km/h.
 
 Values that did not come from a local sensor are printed in yellow, as before.
 
+### UV index
+
+`showUVIndex: true` adds the UV index to the line under the temperature,
+rounded to a whole number. It comes from `sources.uvIndex`, by default
+`["metno"]`, so it needs the `metno` source configured. met.no reports the
+index for a clear sky; under clouds the real one is lower. OpenWeatherMap's
+current weather has no UV index, so when met.no is unavailable the UV index is
+left out instead of falling back.
+
 ### `metno`
 
 ```js

@@ -73,6 +73,22 @@
 		return value * Math.pow(1 - lapse / (parseFloat(temperatureC) + lapse + 273.15), -5.257);
 	}
 
+	/* met.no instant details mapped onto the module's value keys.
+	 *
+	 * The UV index exists only in the complete forecast, and only as the clear
+	 * sky value: under clouds the real index is lower.
+	 */
+	function metnoValues(details) {
+		return {
+			temperature: details.air_temperature,
+			humidity: details.relative_humidity,
+			windSpeed: details.wind_speed,
+			windDirection: details.wind_from_direction,
+			pressure: details.air_pressure_at_sea_level,
+			uvIndex: details.ultraviolet_index_clear_sky
+		};
+	}
+
 	/* priority   - array of source names, most wanted first
 	 * candidates - map source name -> { value, time, maxAgeSeconds, unit }
 	 * returns    - { source, value, unit } or null when no source has a value
@@ -97,6 +113,7 @@
 
 	var api = {
 		resolve: resolve,
+		metnoValues: metnoValues,
 		toMetersPerSecond: toMetersPerSecond,
 		toSeaLevel: toSeaLevel,
 		WIND_SPEED_TO_MS: WIND_SPEED_TO_MS
