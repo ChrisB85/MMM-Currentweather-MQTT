@@ -31,6 +31,8 @@ Module.register("MMM-Currentweather-MQTT",{
 		showHumidity: false,
 		showPressure: false,
 		showUVIndex: false,
+		showAirQuality: false,
+		airQualityLabel: "CAQI",
 		degreeLabel: false,
 		showIndoorTemperature: false,
 		showIndoorHumidity: false,
@@ -88,7 +90,10 @@ Module.register("MMM-Currentweather-MQTT",{
 			sunset: ["owm"],
 			// OpenWeatherMap's current weather has no UV index, so there is no
 			// fallback: without a source the UV index is left out.
-			uvIndex: ["metno"]
+			uvIndex: ["metno"],
+			// No built-in source carries an air quality index; configure one
+			// (e.g. "hass" with an airQuality entity) to show it.
+			airQuality: []
 		},
 
 		// Unit the MQTT wind speed topic publishes in: "kmh", "ms", "mph" or "kn".
@@ -249,6 +254,7 @@ Module.register("MMM-Currentweather-MQTT",{
 		this.temperature = null;
 		this.pressure = null;
 		this.uvIndex = null;
+		this.airQuality = null;
 		this.indoorTemperature = null;
 		this.indoorHumidity = null;
 		this.weatherType = null;
@@ -384,6 +390,24 @@ Module.register("MMM-Currentweather-MQTT",{
 			var spacer7 = document.createElement("sup");
 			spacer7.innerHTML = "&nbsp;&nbsp;&nbsp;&nbsp;";
 			small.appendChild(spacer7);
+		}
+
+		if (this.config.showAirQuality && this.airQuality !== null) {
+			var airQualityLabel = document.createElement("span");
+			airQualityLabel.className = "dimmed";
+			airQualityLabel.textContent = this.config.airQualityLabel;
+			small.appendChild(airQualityLabel);
+
+			// The level, not the source, picks the colour: custom.css styles
+			// the air-quality-<level> classes.
+			var airQuality = document.createElement("span");
+			airQuality.className = "air-quality" + (this.airQuality.levelClass ? " " + this.airQuality.levelClass : "");
+			airQuality.textContent = " " + this.airQuality.value;
+			small.appendChild(airQuality);
+
+			var spacer8 = document.createElement("sup");
+			spacer8.innerHTML = "&nbsp;&nbsp;&nbsp;&nbsp;";
+			small.appendChild(spacer8);
 		}
 
 		var sunriseSunsetIcon = document.createElement("span");
@@ -710,6 +734,7 @@ Module.register("MMM-Currentweather-MQTT",{
 		this.pressure = Math.round(this.pressureAtSeaLevel(pressure));
 
 		this.uvIndex = this.uvIndexValue(data);
+		this.airQuality = this.airQualityValue(data);
 
 		this.fetchedLocationName = data.name;
 		this.feelsLike = 0;
@@ -1109,6 +1134,27 @@ Module.register("MMM-Currentweather-MQTT",{
 	uvIndexValue: function(data) {
 		var picked = WeatherSources.resolve(this.config.sources.uvIndex, this.sourceCandidates("uvIndex", data));
 		return picked ? Math.round(picked.value) : null;
+	},
+
+	/* Air quality index rounded to a whole number, with the CSS class of its
+	 * level, or null when no configured source has one. The level is read from
+	 * the same reading as the index (key airQualityLevel, e.g. the level
+	 * attribute of Home Assistant's Airly CAQI sensor), so both age out
+	 * together. No OpenWeatherMap fallback: its current weather has no index.
+	 *
+	 * returns { value, levelClass } - levelClass null when no level came along
+	 */
+	airQualityValue: function(data) {
+		var picked = WeatherSources.resolve(this.config.sources.airQuality, this.sourceCandidates("airQuality", data));
+		if (!picked) {
+			return null;
+		}
+		var reading = this.externalValues[picked.source];
+		var level = reading && reading.values ? reading.values.airQualityLevel : undefined;
+		return {
+			value: Math.round(picked.value),
+			levelClass: WeatherSources.levelClass("air-quality", level)
+		};
 	},
 
 	isValueTooOld: function(maxAgeSeconds, updatedTime) {

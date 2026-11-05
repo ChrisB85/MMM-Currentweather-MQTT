@@ -89,6 +89,21 @@
 		};
 	}
 
+	/* A level name reported by a source ("very_low", "Medium") as a CSS class:
+	 * prefix plus the name lowercased, anything but letters and digits turned
+	 * into single dashes. The theme colours the classes, the module only names
+	 * them, so a new level from the source needs no code change.
+	 *
+	 * returns null when there is no level.
+	 */
+	function levelClass(prefix, level) {
+		if (level === null || typeof level === "undefined") {
+			return null;
+		}
+		var name = String(level).toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-+|-+$/g, "");
+		return name ? prefix + "-" + name : null;
+	}
+
 	/* priority   - array of source names, most wanted first
 	 * candidates - map source name -> { value, time, maxAgeSeconds, unit }
 	 * returns    - { source, value, unit } or null when no source has a value
@@ -114,6 +129,7 @@
 	var api = {
 		resolve: resolve,
 		metnoValues: metnoValues,
+		levelClass: levelClass,
 		toMetersPerSecond: toMetersPerSecond,
 		toSeaLevel: toSeaLevel,
 		WIND_SPEED_TO_MS: WIND_SPEED_TO_MS

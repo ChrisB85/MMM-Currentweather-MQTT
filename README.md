@@ -221,6 +221,29 @@ index for a clear sky; under clouds the real one is lower. OpenWeatherMap's
 current weather has no UV index, so when met.no is unavailable the UV index is
 left out instead of falling back.
 
+### Air quality
+
+`showAirQuality: true` adds an air quality index to the same line, after the
+UV index, rounded to a whole number and preceded by `airQualityLabel`
+(default `"CAQI"`). No source has an index by default (`sources.airQuality`
+is `[]`), so configure one, e.g. Home Assistant's Airly integration:
+
+```js
+sources: { airQuality: ["hass"] },
+hass: {
+    entities: {
+        airQuality: { entity: "sensor.airly_caqi" },
+        airQualityLevel: { entity: "sensor.airly_caqi", attribute: "level" },
+    },
+},
+```
+
+`airQualityLevel` is optional. When the same source reading carries it, the
+value gets the class `air-quality-<level>` (lowercased, other characters turned
+into dashes: `very_low` becomes `air-quality-very-low`). The module ships no
+colours for it; style the classes in `custom.css`. There is no OpenWeatherMap
+fallback: when the source is unavailable the index is left out.
+
 ### `metno`
 
 ```js

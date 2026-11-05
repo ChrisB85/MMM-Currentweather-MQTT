@@ -1,7 +1,7 @@
 /* Self-check for the source resolver: node weathersources.test.js */
 
 const assert = require("assert");
-const { resolve, toMetersPerSecond, toSeaLevel, metnoValues } = require("./weathersources.js");
+const { resolve, toMetersPerSecond, toSeaLevel, metnoValues, levelClass } = require("./weathersources.js");
 
 const NOW = 1_000_000_000_000;
 const fresh = (value, unit) => ({ value, time: NOW - 60_000, maxAgeSeconds: 1800, unit });
@@ -67,6 +67,13 @@ assert.deepStrictEqual(metnoValues(metnoDetails), {
 // The compact forecast has no UV index: the key stays undefined, not 0.
 delete metnoDetails.ultraviolet_index_clear_sky;
 assert.strictEqual(metnoValues(metnoDetails).uvIndex, undefined);
+
+// A level name from a source turned into a CSS class name.
+assert.strictEqual(levelClass("air-quality", "very_low"), "air-quality-very-low");
+assert.strictEqual(levelClass("air-quality", "Medium"), "air-quality-medium");
+assert.strictEqual(levelClass("air-quality", "<b>x</b>"), "air-quality-b-x-b");
+assert.strictEqual(levelClass("air-quality", ""), null);
+assert.strictEqual(levelClass("air-quality", undefined), null);
 
 console.log("weathersources: all checks passed");
 
@@ -199,5 +206,23 @@ assert.strictEqual(uv.uvIndexValue(owmData), 0);
 // met.no gone too long: no UV at all. OpenWeatherMap has none to fall back on.
 uv.externalValues.metno = { time: Date.now() - 2 * 3600 * 1000, values: { uvIndex: 5 } };
 assert.strictEqual(uv.uvIndexValue(owmData), null);
+
+// Air quality: no source by default, the feature stays off until configured.
+const air = mirror();
+assert.strictEqual(air.airQualityValue(owmData), null);
+// Home Assistant's Airly index, with the level the integration names in the
+// same reading: the level turns into a CSS class the theme colours.
+air.config.sources.airQuality = ["hass"];
+air.externalValues.hass = { time: Date.now(), values: { airQuality: "45.4", airQualityLevel: "low" } };
+assert.deepStrictEqual(air.airQualityValue(owmData), { value: 45, levelClass: "air-quality-low" });
+// A level the theme may not know yet still gets a class, and only a safe one.
+air.externalValues.hass.values.airQualityLevel = "Very High";
+assert.strictEqual(air.airQualityValue(owmData).levelClass, "air-quality-very-high");
+// Index without a level: the value shows, uncoloured.
+delete air.externalValues.hass.values.airQualityLevel;
+assert.deepStrictEqual(air.airQualityValue(owmData), { value: 45, levelClass: null });
+// Home Assistant gone too long: no air quality at all, OpenWeatherMap has none.
+air.externalValues.hass = { time: Date.now() - 2 * 3600 * 1000, values: { airQuality: 45, airQualityLevel: "low" } };
+assert.strictEqual(air.airQualityValue(owmData), null);
 
 console.log("module wiring: all checks passed");
