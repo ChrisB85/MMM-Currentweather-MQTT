@@ -221,16 +221,18 @@ colour feels-like and today's min/max. Without `scales` nothing changes.
 The air quality index without `scales.airQuality` keeps the colour of the
 level its source reports, as a class `air-quality-<level>` for the theme.
 
-Every value (not its icon, label or unit) also carries the class `value`, so
-a theme can keep uncoloured values neutral and the module colour for icons
-and labels; the scale colour is set inline and important, so it wins over
-such a rule. The weather icon already carries the condition as a class
+The colour covers the whole sensor: its icon, label, unit and wind direction
+take the value's colour too. Every one of them carries the class `value`, so
+a theme can keep sensors without a scale neutral; the scale colour is set
+inline and important, so it wins over such a rule. The temperature's weather
+icon is not part of it: it shows the sky, not the temperature. The weather icon already carries the condition as a class
 (`wi-day-sunny`, `wi-rain`, `wi-thunderstorm`, ...), so the theme colours it
 with no config.
 
 A coloured value not from a local sensor loses the yellow mark (the colour
 now means the value) and gets the `remote` class instead, a small raised dot
-by default. Uncoloured values stay yellow as before.
+by default, on the value only. A sensor without a colour stays yellow as a
+whole.
 
 ## Value sources
 

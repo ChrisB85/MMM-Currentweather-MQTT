@@ -310,9 +310,10 @@ Module.register("MMM-Currentweather-MQTT",{
 		return this.config.useKMPHwind ? "km/h" : "m/s";
 	},
 
-	// The look of a value's unit (%, hPa, km/h): the value's colour
-	// and yellow mark, but no second remote dot.
-	unitLook: function(valueLook) {
+	// The look of everything else in a value's sensor (icon, label, unit,
+	// wind direction): the value's colour and yellow mark, but no second
+	// remote dot.
+	partLook: function(valueLook) {
 		return {
 			className: valueLook.className.replace(/ remote\b/, ""),
 			color: valueLook.color
@@ -324,6 +325,16 @@ Module.register("MMM-Currentweather-MQTT",{
 		if (look.color) {
 			element.style.setProperty("color", look.color, "important");
 		}
+	},
+
+	// A whole sensor in one look: the value element gets it, every other part
+	// its partLook. Elements arrive with their own base classes only.
+	paintSensor: function(look, valueElement, parts) {
+		var self = this;
+		this.applyLook(valueElement, valueElement.className, look);
+		parts.forEach(function(part) {
+			self.applyLook(part, part.className, self.partLook(look));
+		});
 	},
 
 	// Gives element the look of a value next to its own classes. The colour
@@ -339,31 +350,26 @@ Module.register("MMM-Currentweather-MQTT",{
 	// elements to show, or null when its value is off or missing.
 	extraRenderers: {
 		wind: function() {
-			var remote = this.isRemoteSource(this.sourceWindDir);
-			var elements = [];
+			var look = this.valueLook("windSpeed", this.windSpeed, this.isRemoteSource(this.sourceWindSpeed));
 
 			var windIcon = document.createElement("span");
-			windIcon.className = "wi wi-strong-wind dimmed" + (remote ? " yellow" : "");
-			elements.push(windIcon);
+			windIcon.className = "wi wi-strong-wind";
 
 			var spacer = document.createElement("sup");
 			spacer.innerHTML = "&nbsp;&nbsp;&nbsp;&nbsp;";
-			elements.push(spacer);
 
 			var windSpeed = document.createElement("span");
-			var speedLook = this.paintValue(windSpeed, "", "windSpeed", this.windSpeed, this.isRemoteSource(this.sourceWindSpeed));
 			windSpeed.innerHTML = " " + this.windSpeed;
-			elements.push(windSpeed);
 
 			var windUnit = document.createElement("sup");
-			this.applyLook(windUnit, "unit unit-text", this.unitLook(speedLook));
+			windUnit.className = "unit unit-text";
 			windUnit.textContent = this.windSpeedUnit();
-			elements.push(windUnit);
 
+			var parts = [windIcon, windUnit];
+			var elements = [windIcon, spacer, windSpeed, windUnit];
 			if (this.config.showWindDirection) {
 				var windDirection = document.createElement("sup");
-				// The direction is its own reading, not the speed's unit: module colour.
-				windDirection.className = "unit" + (remote ? " yellow" : "");
+				windDirection.className = "unit";
 				if (this.config.showWindDirectionAsArrow) {
 					if (this.windDeg !== null) {
 						windDirection.innerHTML = "<i class=\"fa fa-long-arrow-down\" style=\"transform:rotate(" + this.windDeg + "deg);\"></i>";
@@ -371,8 +377,10 @@ Module.register("MMM-Currentweather-MQTT",{
 				} else {
 					windDirection.innerHTML = " " + this.translate(this.windDirection);
 				}
+				parts.push(windDirection);
 				elements.push(windDirection);
 			}
+			this.paintSensor(look, windSpeed, parts);
 			return elements;
 		},
 
@@ -380,21 +388,19 @@ Module.register("MMM-Currentweather-MQTT",{
 			if (!this.config.showHumidity) {
 				return null;
 			}
-			var remote = this.isRemoteSource(this.sourceHum);
-
 			// Icon before the value and the unit raised after it, the way
 			// pressure shows its barometer and hPa.
 			var humidityIcon = document.createElement("span");
-			humidityIcon.className = "wi wi-raindrop dimmed" + (remote ? " yellow" : "");
+			humidityIcon.className = "wi wi-raindrop";
 
 			var humidity = document.createElement("span");
-			var humidityLook = this.paintValue(humidity, "", "humidity", this.humidity, remote);
 			humidity.innerHTML = " " + this.humidity;
 
 			var humidityUnit = document.createElement("sup");
-			this.applyLook(humidityUnit, "unit unit-text", this.unitLook(humidityLook));
+			humidityUnit.className = "unit unit-text";
 			humidityUnit.innerHTML = "%";
 
+			this.paintSensor(this.valueLook("humidity", this.humidity, this.isRemoteSource(this.sourceHum)), humidity, [humidityIcon, humidityUnit]);
 			return [humidityIcon, humidity, humidityUnit];
 		},
 
@@ -402,20 +408,19 @@ Module.register("MMM-Currentweather-MQTT",{
 			if (!this.config.showPressure || this.pressure === null) {
 				return null;
 			}
-			var remote = this.isStationPressure(this.sourcePressure) === false;
-
 			var pressureIcon = document.createElement("span");
-			pressureIcon.className = "wi wi-barometer dimmed";
+			pressureIcon.className = "wi wi-barometer";
 
 			var pressure = document.createElement("span");
-			var pressureLook = this.paintValue(pressure, "", "pressure", this.pressure, remote);
 			pressure.innerHTML = " " + this.pressure;
 
 			// The unit rides raised and small, the way the humidity sign does.
 			var pressureUnit = document.createElement("sup");
-			this.applyLook(pressureUnit, "unit unit-text", this.unitLook(pressureLook));
+			pressureUnit.className = "unit unit-text";
 			pressureUnit.innerHTML = "hPa";
 
+			var remote = this.isStationPressure(this.sourcePressure) === false;
+			this.paintSensor(this.valueLook("pressure", this.pressure, remote), pressure, [pressureIcon, pressureUnit]);
 			return [pressureIcon, pressure, pressureUnit];
 		},
 
@@ -423,16 +428,14 @@ Module.register("MMM-Currentweather-MQTT",{
 			if (!this.config.showUVIndex || this.uvIndex === null) {
 				return null;
 			}
-			// Text labels keep the plain colour, like the hPa unit: dimmed thin text
-			// reads darker than the dimmed icon glyphs next to it.
-			// No local UV sensor exists, so the value is always a remote one.
 			var uvLabel = document.createElement("span");
 			uvLabel.innerHTML = "UV";
 
 			var uvIndex = document.createElement("span");
-			this.paintValue(uvIndex, "", "uvIndex", this.uvIndex, true);
 			uvIndex.innerHTML = " " + this.uvIndex;
 
+			// No local UV sensor exists, so the value is always a remote one.
+			this.paintSensor(this.valueLook("uvIndex", this.uvIndex, true), uvIndex, [uvLabel]);
 			return [uvLabel, uvIndex];
 		},
 
@@ -443,27 +446,30 @@ Module.register("MMM-Currentweather-MQTT",{
 			var airQualityLabel = document.createElement("span");
 			airQualityLabel.textContent = this.config.airQualityLabel;
 
+			var airQuality = document.createElement("span");
+			airQuality.className = "air-quality";
+			airQuality.textContent = " " + this.airQuality.value;
+
 			// The colour comes from scales.airQuality when configured, else from
 			// the level the source reports: custom.css styles the
 			// air-quality-<level> classes. The source never colours it.
-			var airQuality = document.createElement("span");
-			var look = this.paintValue(airQuality, "air-quality", "airQuality", this.airQuality.value, false);
+			var look = this.valueLook("airQuality", this.airQuality.value, false);
 			if (!look.color && this.airQuality.levelClass) {
-				airQuality.className += " " + this.airQuality.levelClass;
+				look.className += " " + this.airQuality.levelClass;
 			}
-			airQuality.textContent = " " + this.airQuality.value;
-
+			this.paintSensor(look, airQuality, [airQualityLabel]);
 			return [airQualityLabel, airQuality];
 		},
 
 		sunriseSunset: function() {
 			var sunriseSunsetIcon = document.createElement("span");
-			sunriseSunsetIcon.className = "wi dimmed " + this.sunriseSunsetIcon;
+			sunriseSunsetIcon.className = "wi " + this.sunriseSunsetIcon;
 
 			var sunriseSunsetTime = document.createElement("span");
-			sunriseSunsetTime.className = "value";
 			sunriseSunsetTime.innerHTML = " " + this.sunriseSunsetTime;
 
+			// A time has no scale: always the neutral look.
+			this.paintSensor(this.valueLook("sunriseSunset", null, false), sunriseSunsetTime, [sunriseSunsetIcon]);
 			return [sunriseSunsetIcon, sunriseSunsetTime];
 		}
 	},

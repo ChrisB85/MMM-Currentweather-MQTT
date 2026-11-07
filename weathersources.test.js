@@ -255,10 +255,51 @@ assert.deepStrictEqual(look.valueLook("windSpeed", "30 km/h", true),
 // A value without a scale keeps the old marking.
 assert.deepStrictEqual(look.valueLook("pressure", 1019, true), { className: "value yellow", color: null });
 
-// A unit wears the colour of its value, without a second remote dot.
-assert.deepStrictEqual(look.unitLook({ className: "value remote", color: "#00ff00" }), { className: "value", color: "#00ff00" });
-assert.deepStrictEqual(look.unitLook({ className: "value yellow", color: null }), { className: "value yellow", color: null });
-assert.deepStrictEqual(look.unitLook({ className: "value", color: null }), { className: "value", color: null });
+// Icons, labels and units wear the colour of their value, without a second remote dot.
+assert.deepStrictEqual(look.partLook({ className: "value remote", color: "#00ff00" }), { className: "value", color: "#00ff00" });
+assert.deepStrictEqual(look.partLook({ className: "value yellow", color: null }), { className: "value yellow", color: null });
+assert.deepStrictEqual(look.partLook({ className: "value", color: null }), { className: "value", color: null });
+
+// Whole sensors: every element of a sensor takes its value's look.
+global.document = {
+	createElement: (tag) => ({
+		tag, className: "", innerHTML: "", textContent: "",
+		style: { color: null, setProperty(name, value) { if (name === "color") { this.color = value; } } }
+	})
+};
+const sensor = mirror();
+sensor.config.showHumidity = true;
+sensor.config.showPressure = true;
+sensor.config.showUVIndex = true;
+sensor.config.showAirQuality = true;
+sensor.config.scales = { humidity: [{ at: 0, color: "#00ff00" }], uvIndex: [{ at: 0, color: "#0000ff" }] };
+sensor.humidity = "76"; sensor.sourceHum = "mqtt";
+sensor.pressure = 1019; sensor.sourcePressure = "owm";
+sensor.uvIndex = 2;
+sensor.airQuality = { value: 56, levelClass: "air-quality-medium" };
+const parts = (name) => sensor.extraRenderers[name].call(sensor).filter((e) => e.innerHTML !== "&nbsp;&nbsp;&nbsp;&nbsp;");
+
+// Coloured: icon, value and unit all the same colour, nothing dimmed.
+for (const part of parts("humidity")) {
+	assert.strictEqual(part.style.color, "#00ff00");
+	assert.ok(!/dimmed|yellow/.test(part.className), part.className);
+}
+// The UV label takes the colour, only the value carries the remote dot.
+const [uvLabel, uvValue] = parts("uvIndex");
+assert.strictEqual(uvLabel.style.color, "#0000ff");
+assert.ok(!/remote/.test(uvLabel.className));
+assert.ok(/remote/.test(uvValue.className));
+// Uncoloured remote pressure: icon, value and unit all neutral and yellow-marked.
+for (const part of parts("pressure")) {
+	assert.strictEqual(part.style.color, null);
+	assert.ok(/\bvalue yellow\b/.test(part.className), part.className);
+	assert.ok(!/dimmed/.test(part.className), part.className);
+}
+// Air quality without a scale: the source level colours label and value alike.
+for (const part of parts("airQuality")) {
+	assert.ok(/air-quality-medium/.test(part.className), part.className);
+}
+delete global.document;
 
 // The wind speed unit follows the display mode the speed is converted to.
 const windUnit = mirror();
