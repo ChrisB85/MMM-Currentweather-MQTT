@@ -40,6 +40,13 @@ Module.register("MMM-Currentweather-MQTT",{
 		showRainfall: false,
 		showTempMax: false,
 		showTempMin: false,
+		// Extra values in the row above and the row below the temperature, in
+		// this order. Names: wind, humidity, pressure, uvIndex, airQuality,
+		// sunriseSunset. The show* switches still turn each one on or off.
+		extraRows: {
+			above: ["wind", "humidity", "pressure", "uvIndex", "airQuality", "sunriseSunset"],
+			below: []
+		},
 
 		initialLoadDelay: 0, // 0 seconds delay
 		retryDelay: 2500,
@@ -173,7 +180,7 @@ Module.register("MMM-Currentweather-MQTT",{
 	
 	// Define required scripts.
 	getScripts: function() {
-		return ["moment.js", "modules/MMM-Currentweather-MQTT/weathersources.js"];
+		return ["moment.js", "modules/MMM-Currentweather-MQTT/weathersources.js", "modules/MMM-Currentweather-MQTT/layout.js"];
 	},
 
 	// Define required scripts.
@@ -275,150 +282,169 @@ Module.register("MMM-Currentweather-MQTT",{
 		});
 	},
 		
-	// add extra information of current weather
-	// windDirection, humidity, sunrise and sunset
-	addExtraInfoWeather: function(wrapper) {
+	// Extra values around the temperature. config.extraRows says which go in
+	// the row above it and which in the row below; each renderer returns the
+	// elements to show, or null when its value is off or missing.
+	extraRenderers: {
+		wind: function() {
+			var remote = this.isRemoteSource(this.sourceWindDir);
+			var elements = [];
 
-		var small = document.createElement("div");
-		small.className = "normal medium";
+			var windIcon = document.createElement("span");
+			windIcon.className = "wi wi-strong-wind dimmed" + (remote ? " yellow" : "");
+			elements.push(windIcon);
 
-		var spacer1 = document.createElement("sup");
-		spacer1.innerHTML = "&nbsp;&nbsp;&nbsp;&nbsp;";
+			var spacer = document.createElement("sup");
+			spacer.innerHTML = "&nbsp;&nbsp;&nbsp;&nbsp;";
+			elements.push(spacer);
 
-		var windIcon = document.createElement("span");
-		windIcon.className = "wi wi-strong-wind dimmed";
-		if (this.isRemoteSource(this.sourceWindDir)) {
-			windIcon.className = windIcon.className + " yellow";
-		}
-		small.appendChild(windIcon);
-		small.appendChild(spacer1);
-
-		var windSpeed = document.createElement("span");
-		if (this.isRemoteSource(this.sourceWindSpeed)) {
-			windSpeed.className = windSpeed.className + " yellow";
-		}
-		windSpeed.innerHTML = " " + this.windSpeed;
-		small.appendChild(windSpeed);
-
-		if (this.config.showWindDirection) {
-			var windDirection = document.createElement("sup");
-			windDirection.className = "unit";
-			if (this.isRemoteSource(this.sourceWindDir)) {
-				windDirection.className = windDirection.className + " yellow";
+			var windSpeed = document.createElement("span");
+			if (this.isRemoteSource(this.sourceWindSpeed)) {
+				windSpeed.className = "yellow";
 			}
-	
-			if (this.config.showWindDirectionAsArrow) {
-				if(this.windDeg !== null) {
-					windDirection.innerHTML = "<i class=\"fa fa-long-arrow-down\" style=\"transform:rotate("+this.windDeg+"deg);\"></i>";
+			windSpeed.innerHTML = " " + this.windSpeed;
+			elements.push(windSpeed);
+
+			if (this.config.showWindDirection) {
+				var windDirection = document.createElement("sup");
+				windDirection.className = "unit" + (remote ? " yellow" : "");
+				if (this.config.showWindDirectionAsArrow) {
+					if (this.windDeg !== null) {
+						windDirection.innerHTML = "<i class=\"fa fa-long-arrow-down\" style=\"transform:rotate(" + this.windDeg + "deg);\"></i>";
+					}
+				} else {
+					windDirection.innerHTML = " " + this.translate(this.windDirection);
 				}
-			} else {
-				windDirection.innerHTML = " " + this.translate(this.windDirection);
+				elements.push(windDirection);
 			}
+			return elements;
+		},
 
-			var spacer3 = document.createElement("sup");
-			spacer3.innerHTML = "&nbsp;&nbsp;&nbsp;&nbsp;";
-	
-			small.appendChild(windDirection);
-			small.appendChild(spacer3);
-		}
-		var spacer = document.createElement("span");
-		spacer.innerHTML = "&nbsp;";
-		small.appendChild(spacer);
+		humidity: function() {
+			if (!this.config.showHumidity) {
+				return null;
+			}
+			var remote = this.isRemoteSource(this.sourceHum);
 
-		if (this.config.showHumidity) {
 			var humidity = document.createElement("span");
-			if (this.isRemoteSource(this.sourceHum)) {
-				humidity.className = humidity.className + " yellow";
+			if (remote) {
+				humidity.className = "yellow";
 			}
 			humidity.innerHTML = this.humidity;
 
 			var humidityIcon = document.createElement("sup");
-			humidityIcon.className = "wi wi-humidity humidityIcon unit";
-			if (this.isRemoteSource(this.sourceHum)) {
-				humidityIcon.className = humidityIcon.className + " yellow";
-			}
+			humidityIcon.className = "wi wi-humidity humidityIcon unit" + (remote ? " yellow" : "");
 			humidityIcon.innerHTML = "&nbsp;";
 
-			var spacer5 = document.createElement("sup");
-			spacer5.innerHTML = "&nbsp;&nbsp;&nbsp;&nbsp;";
+			return [humidity, humidityIcon];
+		},
 
-	
-	
-			small.appendChild(humidity);
-			small.appendChild(humidityIcon);
-			small.appendChild(spacer5);
-		}
+		pressure: function() {
+			if (!this.config.showPressure || this.pressure === null) {
+				return null;
+			}
+			var remote = this.isStationPressure(this.sourcePressure) === false;
 
-		if (this.config.showPressure && this.pressure !== null) {
 			var pressureIcon = document.createElement("span");
 			pressureIcon.className = "wi wi-barometer dimmed";
-			small.appendChild(pressureIcon);
 
 			var pressure = document.createElement("span");
-			if (this.isStationPressure(this.sourcePressure) === false) {
+			if (remote) {
 				pressure.className = "yellow";
 			}
 			pressure.innerHTML = " " + this.pressure;
-			small.appendChild(pressure);
 
 			// The unit rides raised and small, the way the humidity sign does.
 			var pressureUnit = document.createElement("sup");
-			pressureUnit.className = "unit unit-text";
-			if (this.isStationPressure(this.sourcePressure) === false) {
-				pressureUnit.className = pressureUnit.className + " yellow";
-			}
+			pressureUnit.className = "unit unit-text" + (remote ? " yellow" : "");
 			pressureUnit.innerHTML = "hPa";
-			small.appendChild(pressureUnit);
 
-			var spacer6 = document.createElement("sup");
-			spacer6.innerHTML = "&nbsp;&nbsp;&nbsp;&nbsp;";
-			small.appendChild(spacer6);
-		}
+			return [pressureIcon, pressure, pressureUnit];
+		},
 
-		if (this.config.showUVIndex && this.uvIndex !== null) {
+		uvIndex: function() {
+			if (!this.config.showUVIndex || this.uvIndex === null) {
+				return null;
+			}
 			// No local UV sensor exists, so the value is always a remote one.
 			var uvLabel = document.createElement("span");
 			uvLabel.className = "dimmed";
 			uvLabel.innerHTML = "UV";
-			small.appendChild(uvLabel);
 
 			var uvIndex = document.createElement("span");
 			uvIndex.className = "yellow";
 			uvIndex.innerHTML = " " + this.uvIndex;
-			small.appendChild(uvIndex);
 
-			var spacer7 = document.createElement("sup");
-			spacer7.innerHTML = "&nbsp;&nbsp;&nbsp;&nbsp;";
-			small.appendChild(spacer7);
-		}
+			return [uvLabel, uvIndex];
+		},
 
-		if (this.config.showAirQuality && this.airQuality !== null) {
+		airQuality: function() {
+			if (!this.config.showAirQuality || this.airQuality === null) {
+				return null;
+			}
 			var airQualityLabel = document.createElement("span");
 			airQualityLabel.className = "dimmed";
 			airQualityLabel.textContent = this.config.airQualityLabel;
-			small.appendChild(airQualityLabel);
 
 			// The level, not the source, picks the colour: custom.css styles
 			// the air-quality-<level> classes.
 			var airQuality = document.createElement("span");
 			airQuality.className = "air-quality" + (this.airQuality.levelClass ? " " + this.airQuality.levelClass : "");
 			airQuality.textContent = " " + this.airQuality.value;
-			small.appendChild(airQuality);
 
-			var spacer8 = document.createElement("sup");
-			spacer8.innerHTML = "&nbsp;&nbsp;&nbsp;&nbsp;";
-			small.appendChild(spacer8);
+			return [airQualityLabel, airQuality];
+		},
+
+		sunriseSunset: function() {
+			var sunriseSunsetIcon = document.createElement("span");
+			sunriseSunsetIcon.className = "wi dimmed " + this.sunriseSunsetIcon;
+
+			var sunriseSunsetTime = document.createElement("span");
+			sunriseSunsetTime.innerHTML = " " + this.sunriseSunsetTime;
+
+			return [sunriseSunsetIcon, sunriseSunsetTime];
 		}
+	},
 
-		var sunriseSunsetIcon = document.createElement("span");
-		sunriseSunsetIcon.className = "wi dimmed " + this.sunriseSunsetIcon;
-		small.appendChild(sunriseSunsetIcon);
+	// Config rows checked once; unknown or repeated names are logged and skipped.
+	extraRows: function() {
+		if (!this.resolvedExtraRows) {
+			var rows = WeatherLayout.resolveRows(this.config.extraRows, Object.keys(this.extraRenderers));
+			if (rows.unknown.length > 0) {
+				Log.warn(this.name + ": unknown extraRows names skipped: " + rows.unknown.join(", ") + "; known: " + Object.keys(this.extraRenderers).join(", "));
+			}
+			if (rows.duplicates.length > 0) {
+				Log.warn(this.name + ": extraRows names listed twice, shown once: " + rows.duplicates.join(", "));
+			}
+			this.resolvedExtraRows = rows;
+		}
+		return this.resolvedExtraRows;
+	},
 
-		var sunriseSunsetTime = document.createElement("span");
-		sunriseSunsetTime.innerHTML = " " + this.sunriseSunsetTime;
-		small.appendChild(sunriseSunsetTime);
+	// One line of extra values, the same gap between each of them.
+	addExtraRow: function(wrapper, names) {
+		var small = document.createElement("div");
+		small.className = "normal medium";
 
-		wrapper.appendChild(small);
+		var self = this;
+		names.forEach(function(name) {
+			var elements = self.extraRenderers[name].call(self);
+			if (!elements) {
+				return;
+			}
+			if (small.childNodes.length > 0) {
+				var spacer = document.createElement("sup");
+				spacer.innerHTML = "&nbsp;&nbsp;&nbsp;&nbsp;";
+				small.appendChild(spacer);
+			}
+			elements.forEach(function(element) {
+				small.appendChild(element);
+			});
+		});
+
+		if (small.childNodes.length > 0) {
+			wrapper.appendChild(small);
+		}
 	},
 
 	// Override dom generator.
@@ -438,7 +464,7 @@ Module.register("MMM-Currentweather-MQTT",{
 		}
 
 		if (this.config.onlyTemp === false) {
-			this.addExtraInfoWeather(wrapper);
+			this.addExtraRow(wrapper, this.extraRows().above);
 		}
 
 		var spacer1 = document.createElement("sup");
@@ -534,6 +560,10 @@ Module.register("MMM-Currentweather-MQTT",{
 		}
 
 		wrapper.appendChild(large);
+
+		if (this.config.onlyTemp === false) {
+			this.addExtraRow(wrapper, this.extraRows().below);
+		}
 
 		if (this.config.showFeelsLike && this.config.onlyTemp === false){
 			var small = document.createElement("div");

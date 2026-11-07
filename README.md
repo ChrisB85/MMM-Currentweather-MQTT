@@ -174,6 +174,25 @@ Here is an example configuration with description. Put it in the `MagicMirror/co
         </tbody>
 </table>
 
+### Rows above and below the temperature
+
+`extraRows` decides which extra values sit in the row above the temperature and
+which in the row below it, and in what order:
+
+```js
+extraRows: {
+    above: ["wind", "humidity", "pressure", "airQuality"],
+    below: ["uvIndex", "sunriseSunset"],
+},
+```
+
+Names: `wind`, `humidity`, `pressure`, `uvIndex`, `airQuality`,
+`sunriseSunset`. The `show*` switches still turn each value on or off; a name
+left out of both rows is not shown. Setting `extraRows` replaces the whole
+default, so list both rows. A misspelt name or a name in both rows is logged
+in the browser console and skipped (a repeated name stays in the first row).
+The default keeps everything in the row above, as before.
+
 ## Value sources
 
 Every displayed value names the sources to try, in order. The first source that
@@ -214,7 +233,7 @@ Values that did not come from a local sensor are printed in yellow, as before.
 
 ### UV index
 
-`showUVIndex: true` adds the UV index to the line under the temperature,
+`showUVIndex: true` adds the UV index to the extra values (see `extraRows`),
 rounded to a whole number. It comes from `sources.uvIndex`, by default
 `["metno"]`, so it needs the `metno` source configured. met.no reports the
 index for a clear sky; under clouds the real one is lower. OpenWeatherMap's
@@ -223,8 +242,7 @@ left out instead of falling back.
 
 ### Air quality
 
-`showAirQuality: true` adds an air quality index to the same line, after the
-UV index, rounded to a whole number and preceded by `airQualityLabel`
+`showAirQuality: true` adds an air quality index to the extra values, rounded to a whole number and preceded by `airQualityLabel`
 (default `"CAQI"`). No source has an index by default (`sources.airQuality`
 is `[]`), so configure one, e.g. Home Assistant's Airly integration:
 
