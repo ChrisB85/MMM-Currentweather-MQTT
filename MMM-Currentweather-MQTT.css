@@ -99,3 +99,10 @@
 .MMM-Currentweather-MQTT .extra-below {
   margin-top: var(--extra-row-gap, 0);
 }
+
+/* The raindrop glyph sits about 2 px above the digits next to it at the
+   mirror's size; nudge it onto their middle. */
+.MMM-Currentweather-MQTT .wi-raindrop {
+  position: relative;
+  top: 0.07em;
+}
