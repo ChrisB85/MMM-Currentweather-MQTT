@@ -354,15 +354,20 @@ Module.register("MMM-Currentweather-MQTT",{
 			}
 			var remote = this.isRemoteSource(this.sourceHum);
 
+			// Icon before the value and the unit raised after it, the way
+			// pressure shows its barometer and hPa.
+			var humidityIcon = document.createElement("span");
+			humidityIcon.className = "wi wi-raindrop dimmed" + (remote ? " yellow" : "");
+
 			var humidity = document.createElement("span");
 			this.paintValue(humidity, "", "humidity", this.humidity, remote);
-			humidity.innerHTML = this.humidity;
+			humidity.innerHTML = " " + this.humidity;
 
-			var humidityIcon = document.createElement("sup");
-			humidityIcon.className = "wi wi-humidity humidityIcon unit" + (remote ? " yellow" : "");
-			humidityIcon.innerHTML = "&nbsp;";
+			var humidityUnit = document.createElement("sup");
+			humidityUnit.className = "unit unit-text" + (remote ? " yellow" : "");
+			humidityUnit.innerHTML = "%";
 
-			return [humidity, humidityIcon];
+			return [humidityIcon, humidity, humidityUnit];
 		},
 
 		pressure: function() {

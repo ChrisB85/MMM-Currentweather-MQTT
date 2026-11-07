@@ -33,6 +33,7 @@
 .wi-night-alt-cloudy-windy:before { content: "\f023"; }
 .wi-strong-wind:before { content: "\f050"; }
 .wi-humidity:before { content: "\f07a"; }
+.wi-raindrop:before { content: "\f078"; }
 .wi-barometer:before { content: "\f079"; }
 .wi-sunset:before { content: "\f052"; }
 .wi-sunrise:before { content: "\f051"; }
@@ -47,10 +48,6 @@
   transform: translate(0, -3px);
 }
 
-.MMM-Currentweather-MQTT .humidityIcon {
-  padding-right: 4px;
-}
-
 /* The gap between a value and the unit or marker that follows it, the same
  * one for wind, humidity and pressure. */
 .MMM-Currentweather-MQTT .unit {
@@ -63,9 +60,6 @@
   padding-left: 3px;
 }
 
-.MMM-Currentweather-MQTT .humidity-padding {
-  padding-bottom: 6px;
-}
 .MMM-Currentweather-MQTT .red {
   color: red;
 }
