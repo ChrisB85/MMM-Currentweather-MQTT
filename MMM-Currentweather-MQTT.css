@@ -96,3 +96,12 @@
 .MMM-Currentweather-MQTT .extra-item + .extra-item {
   margin-left: var(--extra-gap, 0.85em);
 }
+
+/* Gap between the extra rows and the temperature; set --extra-row-gap in
+   custom.css. None by default. */
+.MMM-Currentweather-MQTT .extra-above {
+  margin-bottom: var(--extra-row-gap, 0);
+}
+.MMM-Currentweather-MQTT .extra-below {
+  margin-top: var(--extra-row-gap, 0);
+}

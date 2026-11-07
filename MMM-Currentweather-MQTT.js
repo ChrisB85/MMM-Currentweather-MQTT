@@ -451,10 +451,12 @@ Module.register("MMM-Currentweather-MQTT",{
 	},
 
 	// One line of extra values, each in its own .extra-item so the theme sets
-	// the gap between them (--extra-gap, see the module CSS).
-	addExtraRow: function(wrapper, names) {
+	// the gap between them (--extra-gap) and, by the row class extra-<row>,
+	// the gap to the temperature (--extra-row-gap); see the module CSS.
+	addExtraRow: function(wrapper, row) {
+		var names = this.extraRows()[row];
 		var small = document.createElement("div");
-		small.className = "normal medium";
+		small.className = "normal medium extra-row extra-" + row;
 
 		var self = this;
 		names.forEach(function(name) {
@@ -492,7 +494,7 @@ Module.register("MMM-Currentweather-MQTT",{
 		}
 
 		if (this.config.onlyTemp === false) {
-			this.addExtraRow(wrapper, this.extraRows().above);
+			this.addExtraRow(wrapper, "above");
 		}
 
 		var spacer1 = document.createElement("sup");
@@ -587,7 +589,7 @@ Module.register("MMM-Currentweather-MQTT",{
 		wrapper.appendChild(large);
 
 		if (this.config.onlyTemp === false) {
-			this.addExtraRow(wrapper, this.extraRows().below);
+			this.addExtraRow(wrapper, "below");
 		}
 
 		if (this.config.showFeelsLike && this.config.onlyTemp === false){
