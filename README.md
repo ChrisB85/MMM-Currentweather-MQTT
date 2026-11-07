@@ -229,6 +229,11 @@ icon is not part of it: it shows the sky, not the temperature. The weather icon 
 (`wi-day-sunny`, `wi-rain`, `wi-thunderstorm`, ...), so the theme colours it
 with no config.
 
+The temperature scale can also colour another module's forecast, e.g. the
+default `weather` module: `forecastSelector: ".module.weather"` names its
+container, `forecastCells` (default `".min-temp, .max-temp"`) its temperature
+cells. The cells are coloured again after every redraw of that module.
+
 A coloured value not from a local sensor loses the yellow mark (the colour
 now means the value) and gets the `remote` class instead, a small raised dot
 by default, on the value only. A sensor without a colour stays yellow as a

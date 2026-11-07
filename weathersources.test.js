@@ -325,4 +325,14 @@ assert.strictEqual(windUnit.windSpeedUnit(), "m/s");
 windUnit.config.useBeaufort = true;
 assert.strictEqual(windUnit.windSpeedUnit(), "Bft");
 
+// Forecast cells of another module: the temperature text gets the temperature scale.
+const forecast = mirror();
+forecast.config.scales = { temperature: TEMP };
+assert.strictEqual(forecast.forecastCellColour("-2.9°"), "#0000ff");
+assert.strictEqual(forecast.forecastCellColour("20.0°"), "color-mix(in oklch, #ff0000 50%, #00ff00)");
+assert.strictEqual(forecast.forecastCellColour("20,0°"), "color-mix(in oklch, #ff0000 50%, #00ff00)");   // decimal comma
+assert.strictEqual(forecast.forecastCellColour(""), null);
+forecast.config.scales = {};
+assert.strictEqual(forecast.forecastCellColour("5°"), null);
+
 console.log("module wiring: all checks passed");

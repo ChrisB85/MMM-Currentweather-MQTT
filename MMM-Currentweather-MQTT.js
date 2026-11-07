@@ -44,6 +44,11 @@ Module.register("MMM-Currentweather-MQTT",{
 		// pressure, uvIndex, airQuality): [{ at: 0, color: "#2d8fe0" }, ...]
 		// in display units; the colour flows between stops. None by default.
 		scales: {},
+		// Another module's forecast to colour with scales.temperature: a CSS
+		// selector of its container (e.g. ".module.weather"), empty = off, and
+		// the selector of its temperature cells inside it.
+		forecastSelector: "",
+		forecastCells: ".min-temp, .max-temp",
 		// Extra values in the row above and the row below the temperature, in
 		// this order. Names: wind, humidity, pressure, uvIndex, airQuality,
 		// sunriseSunset. The show* switches still turn each one on or off.
@@ -325,6 +330,40 @@ Module.register("MMM-Currentweather-MQTT",{
 		if (look.color) {
 			element.style.setProperty("color", look.color, "important");
 		}
+	},
+
+	// Colour of a forecast temperature cell ("-2.9°", "20,0°") on the
+	// temperature scale, null without one.
+	forecastCellColour: function(text) {
+		return WeatherSources.colourFor(String(text).replace(",", "."), (this.config.scales || {}).temperature);
+	},
+
+	colourForecast: function(root) {
+		var self = this;
+		root.querySelectorAll(this.config.forecastCells).forEach(function(cell) {
+			var color = self.forecastCellColour(cell.textContent);
+			if (color) {
+				cell.style.setProperty("color", color, "important");
+			} else {
+				cell.style.removeProperty("color");
+			}
+		});
+	},
+
+	// The other module redraws its forecast whenever it likes: colour it now
+	// and after every redraw. Only child changes are watched, so setting the
+	// colour does not trigger another pass.
+	watchForecast: function() {
+		if (!this.config.forecastSelector) {
+			return;
+		}
+		var self = this;
+		document.querySelectorAll(this.config.forecastSelector).forEach(function(root) {
+			self.colourForecast(root);
+			new MutationObserver(function() {
+				self.colourForecast(root);
+			}).observe(root, { childList: true, subtree: true });
+		});
 	},
 
 	// A whole sensor in one look: the value element gets it, every other part
@@ -697,6 +736,7 @@ Module.register("MMM-Currentweather-MQTT",{
 	// Override notification handler.
 	notificationReceived: function(notification, payload, sender) {
 		if (notification === "DOM_OBJECTS_CREATED") {
+			this.watchForecast();
 			if (this.config.appendLocationNameToHeader) {
 				this.hide(0, function() {}, {lockString: this.identifier});
 			}
