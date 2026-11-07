@@ -90,3 +90,9 @@
   vertical-align: super;
   opacity: 0.7;
 }
+
+/* Gap between the extra values in a row; set --extra-gap in custom.css.
+   The default matches the four raised spaces used before. */
+.MMM-Currentweather-MQTT .extra-item + .extra-item {
+  margin-left: var(--extra-gap, 0.85em);
+}
