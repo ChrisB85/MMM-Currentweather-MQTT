@@ -193,53 +193,43 @@ default, so list both rows. A misspelt name or a name in both rows is logged
 in the browser console and skipped (a repeated name stays in the first row).
 The default keeps everything in the row above, as before.
 
-### Colour levels
+### Colour scales
 
-The air quality index takes its colour from the level its source reports.
-For values whose source has no level, `levels` sets thresholds per value,
-keyed like `sources` (`temperature`, `humidity`, `windSpeed`, `pressure`,
-`uvIndex`), lowest first, in the display
-units of `config.units`:
+`scales` colours values by how big they are. Each value, keyed like `sources`
+(`temperature`, `humidity`, `windSpeed`, `pressure`, `uvIndex`, `airQuality`),
+lists colour stops in the display units of `config.units`:
 
 ```js
-levels: {
+scales: {
     temperature: [
-        { below: 0, level: "freezing" },
-        { below: 10, level: "cold" },
-        { below: 20, level: "mild" },
-        { below: 28, level: "warm" },
-        { level: "hot" },               // no "below": everything above
-    ],
-    uvIndex: [                          // WHO bands
-        { below: 3, level: "low" },
-        { below: 6, level: "moderate" },
-        { below: 8, level: "high" },
-        { below: 11, level: "very-high" },
-        { level: "extreme" },
+        { at: -15, color: "#3a5bd9" },
+        { at: 0, color: "#2d8fe0" },
+        { at: 8, color: "#1fa9a0" },
+        { at: 15, color: "#4cb83a" },
+        { at: 22, color: "#d9b21e" },
+        { at: 28, color: "#f07818" },
+        { at: 35, color: "#e0302a" },
     ],
 },
 ```
 
-A value gets the first level it is below; a threshold belongs to the level
-above it. Each level becomes a class `<value in kebab case>-<level>`
-(`temperature-hot`, `wind-speed-strong`, `uv-index-very-high`) and the theme
-colours it, e.g. in
-`custom.css`:
+Between two stops the colour flows: the two colours are mixed in OKLCH by the
+value's distance to each (`color-mix()`, Chromium 111 or newer). Below the
+first and above the last stop the end colour stays. Temperature stops also
+colour feels-like and today's min/max. Without `scales` nothing changes.
 
-```css
-.module.MMM-Currentweather-MQTT .temperature-hot { color: #ff5a3c !important; }
-```
+The air quality index without `scales.airQuality` keeps the colour of the
+level its source reports, as a class `air-quality-<level>` for the theme.
 
 Every value (not its icon, label or unit) also carries the class `value`, so
-a theme can keep values neutral and the module colour for icons and labels;
-put such a `.value` rule before the level rules, the later rule wins.
-The weather icon already carries the condition as a class (`wi-day-sunny`,
-`wi-rain`, `wi-thunderstorm`, ...), so the theme colours it with no config.
-Temperature levels also colour feels-like and today's min/max. A level with
-no CSS rule keeps the default colour. Without `levels` nothing changes.
+a theme can keep uncoloured values neutral and the module colour for icons
+and labels; the scale colour is set inline and important, so it wins over
+such a rule. The weather icon already carries the condition as a class
+(`wi-day-sunny`, `wi-rain`, `wi-thunderstorm`, ...), so the theme colours it
+with no config.
 
 A coloured value not from a local sensor loses the yellow mark (the colour
-now means the level) and gets the `remote` class instead, a small raised dot
+now means the value) and gets the `remote` class instead, a small raised dot
 by default. Uncoloured values stay yellow as before.
 
 ## Value sources

@@ -1,7 +1,7 @@
 /* Self-check for the source resolver: node weathersources.test.js */
 
 const assert = require("assert");
-const { resolve, toMetersPerSecond, toSeaLevel, metnoValues, levelClass, levelFor } = require("./weathersources.js");
+const { resolve, toMetersPerSecond, toSeaLevel, metnoValues, levelClass, colourFor } = require("./weathersources.js");
 
 const NOW = 1_000_000_000_000;
 const fresh = (value, unit) => ({ value, time: NOW - 60_000, maxAgeSeconds: 1800, unit });
@@ -75,20 +75,22 @@ assert.strictEqual(levelClass("air-quality", "<b>x</b>"), "air-quality-b-x-b");
 assert.strictEqual(levelClass("air-quality", ""), null);
 assert.strictEqual(levelClass("air-quality", undefined), null);
 
-// Threshold levels: the first entry the value is below wins, an entry
-// without "below" takes everything above the last threshold.
-const TEMP = [{ below: 0, level: "freezing" }, { below: 10, level: "cold" }, { level: "hot" }];
-assert.strictEqual(levelFor(-5, TEMP), "freezing");
-assert.strictEqual(levelFor(0, TEMP), "cold");          // a threshold belongs to the level above it
-assert.strictEqual(levelFor(9.9, TEMP), "cold");
-assert.strictEqual(levelFor(35, TEMP), "hot");
-// No catch-all entry: above the last threshold there is no level.
-assert.strictEqual(levelFor(12, [{ below: 10, level: "cold" }]), null);
-// No thresholds configured, or no number to compare: no level.
-assert.strictEqual(levelFor(5, undefined), null);
-assert.strictEqual(levelFor(5, []), null);
-assert.strictEqual(levelFor(NaN, TEMP), null);
-assert.strictEqual(levelFor(null, TEMP), null);
+// Colour scales: a value between two stops mixes their colours in OKLCH by
+// its distance to each, a value past either end takes that end's colour.
+const TEMP = [{ at: 0, color: "#0000ff" }, { at: 10, color: "#00ff00" }, { at: 30, color: "#ff0000" }];
+assert.strictEqual(colourFor(-5, TEMP), "#0000ff");
+assert.strictEqual(colourFor(0, TEMP), "#0000ff");
+assert.strictEqual(colourFor(10, TEMP), "#00ff00");
+assert.strictEqual(colourFor(2.5, TEMP), "color-mix(in oklch, #00ff00 25%, #0000ff)");
+assert.strictEqual(colourFor("20", TEMP), "color-mix(in oklch, #ff0000 50%, #00ff00)");
+assert.strictEqual(colourFor("52 km/h", TEMP), "#ff0000");   // the number in front counts
+// Stops given out of order still read lowest first.
+assert.strictEqual(colourFor(5, [TEMP[1], TEMP[0]]), "color-mix(in oklch, #00ff00 50%, #0000ff)");
+// No scale configured, or no number to compare: no colour.
+assert.strictEqual(colourFor(5, undefined), null);
+assert.strictEqual(colourFor(5, []), null);
+assert.strictEqual(colourFor(NaN, TEMP), null);
+assert.strictEqual(colourFor(null, TEMP), null);
 
 console.log("weathersources: all checks passed");
 
@@ -240,26 +242,17 @@ assert.deepStrictEqual(air.airQualityValue(owmData), { value: 45, levelClass: nu
 air.externalValues.hass = { time: Date.now() - 2 * 3600 * 1000, values: { airQuality: 45, airQualityLevel: "low" } };
 assert.strictEqual(air.airQualityValue(owmData), null);
 
-// Value colour: every value carries "value" (the theme makes it neutral); a
-// configured level replaces the yellow "not a local sensor" mark with the
-// level class plus the separate "remote" mark.
-const colour = mirror();
-assert.strictEqual(colour.valueClass("temperature", 30, false), "value");
-assert.strictEqual(colour.valueClass("temperature", 30, true), "value yellow");
-colour.config.levels = {
-	temperature: TEMP,
-	uvIndex: [{ below: 3, level: "low" }, { level: "high" }],
-	windSpeed: [{ below: 40, level: "calm" }, { level: "strong" }],
-	humidity: [{ below: 30, level: "dry" }, { below: 70, level: "comfortable" }, { level: "humid" }],
-};
-assert.strictEqual(colour.valueClass("temperature", -2, false), "value temperature-freezing");
-assert.strictEqual(colour.valueClass("temperature", "12", true), "value temperature-hot remote");
-assert.strictEqual(colour.valueClass("uvIndex", 7, true), "value uv-index-high remote");
-// The wind speed string carries its unit, the number in front still counts.
-assert.strictEqual(colour.valueClass("windSpeed", "52 km/h", true), "value wind-speed-strong remote");
-assert.strictEqual(colour.valueClass("humidity", "85", false), "value humidity-humid");
-// Outside every configured level the old marking stays.
-colour.config.levels.temperature = [{ below: 0, level: "freezing" }];
-assert.strictEqual(colour.valueClass("temperature", 5, true), "value yellow");
+// Value look: every value carries "value" (the theme makes it neutral); a
+// configured scale gives it a colour and trades the yellow "not a local
+// sensor" mark for the separate "remote" mark.
+const look = mirror();
+assert.deepStrictEqual(look.valueLook("temperature", 30, false), { className: "value", color: null });
+assert.deepStrictEqual(look.valueLook("temperature", 30, true), { className: "value yellow", color: null });
+look.config.scales = { temperature: TEMP, windSpeed: [{ at: 0, color: "#00ff00" }, { at: 60, color: "#ff0000" }] };
+assert.deepStrictEqual(look.valueLook("temperature", 10, false), { className: "value", color: "#00ff00" });
+assert.deepStrictEqual(look.valueLook("windSpeed", "30 km/h", true),
+	{ className: "value remote", color: "color-mix(in oklch, #ff0000 50%, #00ff00)" });
+// A value without a scale keeps the old marking.
+assert.deepStrictEqual(look.valueLook("pressure", 1019, true), { className: "value yellow", color: null });
 
 console.log("module wiring: all checks passed");

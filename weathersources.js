@@ -104,26 +104,35 @@
 		return name ? prefix + "-" + name : null;
 	}
 
-	/* A level for a number from configured thresholds, for values whose source
-	 * reports no level of its own (temperature, UV index).
+	/* A colour for a number from a configured scale, for values coloured by
+	 * how big they are (temperature, wind, UV index...).
 	 *
-	 * thresholds - [{ below: 0, level: "freezing" }, ..., { level: "hot" }],
-	 *              lowest first; an entry without "below" takes the rest
-	 * returns the level of the first entry the value is below, or null when
-	 * there are no thresholds, no number or no entry fits.
+	 * stops   - [{ at: -15, color: "#3a5bd9" }, ..., { at: 35, color: "#e0302a" }]
+	 * returns a CSS colour: between two stops their colours mixed in OKLCH by
+	 * the value's distance to each, past either end that end's colour; null
+	 * when there is no scale or no number.
 	 */
-	function levelFor(value, thresholds) {
+	function colourFor(value, stops) {
 		var number = parseFloat(value);
-		if (!Array.isArray(thresholds) || isNaN(number)) {
+		if (!Array.isArray(stops) || stops.length === 0 || isNaN(number)) {
 			return null;
 		}
-		for (var i = 0; i < thresholds.length; i++) {
-			var below = thresholds[i].below;
-			if (typeof below === "undefined" || number < below) {
-				return thresholds[i].level;
+		var sorted = stops.slice().sort(function(a, b) { return a.at - b.at; });
+		if (number <= sorted[0].at) {
+			return sorted[0].color;
+		}
+		for (var i = 1; i < sorted.length; i++) {
+			var low = sorted[i - 1];
+			var high = sorted[i];
+			if (number <= high.at) {
+				if (number === high.at) {
+					return high.color;
+				}
+				var share = Math.round((number - low.at) / (high.at - low.at) * 1000) / 10;
+				return "color-mix(in oklch, " + high.color + " " + share + "%, " + low.color + ")";
 			}
 		}
-		return null;
+		return sorted[sorted.length - 1].color;
 	}
 
 	/* priority   - array of source names, most wanted first
@@ -152,7 +161,7 @@
 		resolve: resolve,
 		metnoValues: metnoValues,
 		levelClass: levelClass,
-		levelFor: levelFor,
+		colourFor: colourFor,
 		toMetersPerSecond: toMetersPerSecond,
 		toSeaLevel: toSeaLevel,
 		WIND_SPEED_TO_MS: WIND_SPEED_TO_MS

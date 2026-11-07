@@ -40,11 +40,10 @@ Module.register("MMM-Currentweather-MQTT",{
 		showRainfall: false,
 		showTempMax: false,
 		showTempMin: false,
-		// Colour levels for values whose source reports none, keyed like
-		// sources (temperature, humidity, windSpeed, pressure, uvIndex): [{ below: 0, level: "freezing" }, ...,
-		// { level: "hot" }] in display units. Each level becomes the class
-		// <key-in-kebab-case>-<level>, coloured by the theme. None by default.
-		levels: {},
+		// Colour scales, keyed like sources (temperature, humidity, windSpeed,
+		// pressure, uvIndex, airQuality): [{ at: 0, color: "#2d8fe0" }, ...]
+		// in display units; the colour flows between stops. None by default.
+		scales: {},
 		// Extra values in the row above and the row below the temperature, in
 		// this order. Names: wind, humidity, pressure, uvIndex, airQuality,
 		// sunriseSunset. The show* switches still turn each one on or off.
@@ -287,23 +286,30 @@ Module.register("MMM-Currentweather-MQTT",{
 		});
 	},
 		
-	// CSS classes of a value: "value" always (the theme can make values
-	// neutral and leave icons and labels in the module colour), its colour
-	// level when config.levels has one, then "remote" marks a value not from a
-	// local sensor; without a level such a value stays "yellow", as before.
-	valueClass: function(key, value, remote) {
-		var prefix = key.replace(/[A-Z]/g, function(letter) { return "-" + letter.toLowerCase(); });
-		var levelClass = WeatherSources.levelClass(prefix, WeatherSources.levelFor(value, (this.config.levels || {})[key]));
-		var classes = ["value"];
-		if (levelClass) {
-			classes.push(levelClass);
-			if (remote) {
-				classes.push("remote");
-			}
+	// How a value looks: "value" always (the theme can make values neutral and
+	// leave icons and labels in the module colour) and its colour from
+	// config.scales; "remote" marks a coloured value not from a local sensor,
+	// an uncoloured one stays "yellow", as before scales existed.
+	valueLook: function(key, value, remote) {
+		var color = WeatherSources.colourFor(value, (this.config.scales || {})[key]);
+		var className = "value";
+		if (color) {
+			className += remote ? " remote" : "";
 		} else if (remote) {
-			classes.push("yellow");
+			className += " yellow";
 		}
-		return classes.join(" ");
+		return { className: className, color: color };
+	},
+
+	// Gives element the look of a value next to its own classes. The colour
+	// goes inline and important, the theme's .value rule is important too.
+	paintValue: function(element, baseClass, key, value, remote) {
+		var look = this.valueLook(key, value, remote);
+		element.className = (baseClass + " " + look.className).trim();
+		if (look.color) {
+			element.style.setProperty("color", look.color, "important");
+		}
+		return look;
 	},
 
 	// Extra values around the temperature. config.extraRows says which go in
@@ -323,7 +329,7 @@ Module.register("MMM-Currentweather-MQTT",{
 			elements.push(spacer);
 
 			var windSpeed = document.createElement("span");
-			windSpeed.className = this.valueClass("windSpeed", this.windSpeed, this.isRemoteSource(this.sourceWindSpeed));
+			this.paintValue(windSpeed, "", "windSpeed", this.windSpeed, this.isRemoteSource(this.sourceWindSpeed));
 			windSpeed.innerHTML = " " + this.windSpeed;
 			elements.push(windSpeed);
 
@@ -349,7 +355,7 @@ Module.register("MMM-Currentweather-MQTT",{
 			var remote = this.isRemoteSource(this.sourceHum);
 
 			var humidity = document.createElement("span");
-			humidity.className = this.valueClass("humidity", this.humidity, remote);
+			this.paintValue(humidity, "", "humidity", this.humidity, remote);
 			humidity.innerHTML = this.humidity;
 
 			var humidityIcon = document.createElement("sup");
@@ -369,7 +375,7 @@ Module.register("MMM-Currentweather-MQTT",{
 			pressureIcon.className = "wi wi-barometer dimmed";
 
 			var pressure = document.createElement("span");
-			pressure.className = this.valueClass("pressure", this.pressure, remote);
+			this.paintValue(pressure, "", "pressure", this.pressure, remote);
 			pressure.innerHTML = " " + this.pressure;
 
 			// The unit rides raised and small, the way the humidity sign does.
@@ -391,7 +397,7 @@ Module.register("MMM-Currentweather-MQTT",{
 			uvLabel.innerHTML = "UV";
 
 			var uvIndex = document.createElement("span");
-			uvIndex.className = this.valueClass("uvIndex", this.uvIndex, true);
+			this.paintValue(uvIndex, "", "uvIndex", this.uvIndex, true);
 			uvIndex.innerHTML = " " + this.uvIndex;
 
 			return [uvLabel, uvIndex];
@@ -404,10 +410,14 @@ Module.register("MMM-Currentweather-MQTT",{
 			var airQualityLabel = document.createElement("span");
 			airQualityLabel.textContent = this.config.airQualityLabel;
 
-			// The level, not the source, picks the colour: custom.css styles
-			// the air-quality-<level> classes.
+			// The colour comes from scales.airQuality when configured, else from
+			// the level the source reports: custom.css styles the
+			// air-quality-<level> classes. The source never colours it.
 			var airQuality = document.createElement("span");
-			airQuality.className = "value air-quality" + (this.airQuality.levelClass ? " " + this.airQuality.levelClass : "");
+			var look = this.paintValue(airQuality, "air-quality", "airQuality", this.airQuality.value, false);
+			if (!look.color && this.airQuality.levelClass) {
+				airQuality.className += " " + this.airQuality.levelClass;
+			}
 			airQuality.textContent = " " + this.airQuality.value;
 
 			return [airQualityLabel, airQuality];
@@ -548,7 +558,7 @@ Module.register("MMM-Currentweather-MQTT",{
 		}
 
 		var temperature = document.createElement("span");
-		temperature.className = ("bright " + this.valueClass("temperature", this.temperature, this.isRemoteSource(this.sourceTemp))).trim();
+		this.paintValue(temperature, "bright", "temperature", this.temperature, this.isRemoteSource(this.sourceTemp));
 
 		temperature.innerHTML = " " + this.temperature.replace(".", this.config.decimalSymbol) + degreeLabel;
 		large.appendChild(temperature);
@@ -586,7 +596,7 @@ Module.register("MMM-Currentweather-MQTT",{
 			small.className = "normal medium";
 
 			var feelsLike = document.createElement("span");
-			feelsLike.className = ("dimmed " + this.valueClass("temperature", this.feelsLike, false)).trim();
+			this.paintValue(feelsLike, "dimmed", "temperature", this.feelsLike, false);
 			feelsLike.innerHTML = this.translate("FEELS") + " " + this.feelsLike + degreeLabel;
 			small.appendChild(feelsLike);
 
@@ -599,7 +609,7 @@ Module.register("MMM-Currentweather-MQTT",{
 
 			if (this.config.showTempMin) {
 				var tempMin = document.createElement("span");
-				tempMin.className = ("normal medium " + this.valueClass("temperature", this.tempMinToday, false)).trim();
+				this.paintValue(tempMin, "normal medium", "temperature", this.tempMinToday, false);
 				tempMin.innerHTML = "Min.: " + this.tempMinToday + " °C";
 	
 				var spacer = document.createElement("sup");
@@ -612,7 +622,7 @@ Module.register("MMM-Currentweather-MQTT",{
 
 			if (this.config.showTempMax) {
 				var tempMax = document.createElement("span");
-				tempMax.className = ("normal medium " + this.valueClass("temperature", this.tempMaxToday, false)).trim();
+				this.paintValue(tempMax, "normal medium", "temperature", this.tempMaxToday, false);
 				tempMax.innerHTML = "Max.: " + this.tempMaxToday + " °C";
 	
 				var spacer = document.createElement("sup");
