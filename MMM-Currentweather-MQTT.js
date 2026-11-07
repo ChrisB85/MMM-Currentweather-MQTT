@@ -383,9 +383,10 @@ Module.register("MMM-Currentweather-MQTT",{
 			if (!this.config.showUVIndex || this.uvIndex === null) {
 				return null;
 			}
+			// Text labels keep the plain colour, like the hPa unit: dimmed thin text
+			// reads darker than the dimmed icon glyphs next to it.
 			// No local UV sensor exists, so the value is always a remote one.
 			var uvLabel = document.createElement("span");
-			uvLabel.className = "dimmed";
 			uvLabel.innerHTML = "UV";
 
 			var uvIndex = document.createElement("span");
@@ -400,7 +401,6 @@ Module.register("MMM-Currentweather-MQTT",{
 				return null;
 			}
 			var airQualityLabel = document.createElement("span");
-			airQualityLabel.className = "dimmed";
 			airQualityLabel.textContent = this.config.airQualityLabel;
 
 			// The level, not the source, picks the colour: custom.css styles
