@@ -197,7 +197,8 @@ The default keeps everything in the row above, as before.
 
 The air quality index takes its colour from the level its source reports.
 For values whose source has no level, `levels` sets thresholds per value,
-keyed like `sources` (`temperature`, `uvIndex`), lowest first, in the display
+keyed like `sources` (`temperature`, `humidity`, `windSpeed`, `pressure`,
+`uvIndex`), lowest first, in the display
 units of `config.units`:
 
 ```js
@@ -221,13 +222,19 @@ levels: {
 
 A value gets the first level it is below; a threshold belongs to the level
 above it. Each level becomes a class `<value in kebab case>-<level>`
-(`temperature-hot`, `uv-index-very-high`) and the theme colours it, e.g. in
+(`temperature-hot`, `wind-speed-strong`, `uv-index-very-high`) and the theme
+colours it, e.g. in
 `custom.css`:
 
 ```css
 .module.MMM-Currentweather-MQTT .temperature-hot { color: #ff5a3c !important; }
 ```
 
+Every value (not its icon, label or unit) also carries the class `value`, so
+a theme can keep values neutral and the module colour for icons and labels;
+put such a `.value` rule before the level rules, the later rule wins.
+The weather icon already carries the condition as a class (`wi-day-sunny`,
+`wi-rain`, `wi-thunderstorm`, ...), so the theme colours it with no config.
 Temperature levels also colour feels-like and today's min/max. A level with
 no CSS rule keeps the default colour. Without `levels` nothing changes.
 

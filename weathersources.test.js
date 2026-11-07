@@ -240,17 +240,26 @@ assert.deepStrictEqual(air.airQualityValue(owmData), { value: 45, levelClass: nu
 air.externalValues.hass = { time: Date.now() - 2 * 3600 * 1000, values: { airQuality: 45, airQualityLevel: "low" } };
 assert.strictEqual(air.airQualityValue(owmData), null);
 
-// Value colour: a configured level replaces the yellow "not a local sensor"
-// mark with the level class plus the separate "remote" mark.
+// Value colour: every value carries "value" (the theme makes it neutral); a
+// configured level replaces the yellow "not a local sensor" mark with the
+// level class plus the separate "remote" mark.
 const colour = mirror();
-assert.strictEqual(colour.valueClass("temperature", 30, false), "");
-assert.strictEqual(colour.valueClass("temperature", 30, true), "yellow");
-colour.config.levels = { temperature: TEMP, uvIndex: [{ below: 3, level: "low" }, { level: "high" }] };
-assert.strictEqual(colour.valueClass("temperature", -2, false), "temperature-freezing");
-assert.strictEqual(colour.valueClass("temperature", "12", true), "temperature-hot remote");
-assert.strictEqual(colour.valueClass("uvIndex", 7, true), "uv-index-high remote");
+assert.strictEqual(colour.valueClass("temperature", 30, false), "value");
+assert.strictEqual(colour.valueClass("temperature", 30, true), "value yellow");
+colour.config.levels = {
+	temperature: TEMP,
+	uvIndex: [{ below: 3, level: "low" }, { level: "high" }],
+	windSpeed: [{ below: 40, level: "calm" }, { level: "strong" }],
+	humidity: [{ below: 30, level: "dry" }, { below: 70, level: "comfortable" }, { level: "humid" }],
+};
+assert.strictEqual(colour.valueClass("temperature", -2, false), "value temperature-freezing");
+assert.strictEqual(colour.valueClass("temperature", "12", true), "value temperature-hot remote");
+assert.strictEqual(colour.valueClass("uvIndex", 7, true), "value uv-index-high remote");
+// The wind speed string carries its unit, the number in front still counts.
+assert.strictEqual(colour.valueClass("windSpeed", "52 km/h", true), "value wind-speed-strong remote");
+assert.strictEqual(colour.valueClass("humidity", "85", false), "value humidity-humid");
 // Outside every configured level the old marking stays.
 colour.config.levels.temperature = [{ below: 0, level: "freezing" }];
-assert.strictEqual(colour.valueClass("temperature", 5, true), "yellow");
+assert.strictEqual(colour.valueClass("temperature", 5, true), "value yellow");
 
 console.log("module wiring: all checks passed");
