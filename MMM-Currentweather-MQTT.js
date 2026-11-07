@@ -301,14 +301,36 @@ Module.register("MMM-Currentweather-MQTT",{
 		return { className: className, color: color };
 	},
 
-	// Gives element the look of a value next to its own classes. The colour
-	// goes inline and important, the theme's .value rule is important too.
-	paintValue: function(element, baseClass, key, value, remote) {
-		var look = this.valueLook(key, value, remote);
+	// The unit of this.windSpeed, the same branches that convert it in
+	// processWeather: Beaufort, km/h or m/s.
+	windSpeedUnit: function() {
+		if (this.config.useBeaufort) {
+			return "Bft";
+		}
+		return this.config.useKMPHwind ? "km/h" : "m/s";
+	},
+
+	// The look of a value's unit (%, hPa, km/h): the value's colour
+	// and yellow mark, but no second remote dot.
+	unitLook: function(valueLook) {
+		return {
+			className: valueLook.className.replace(/ remote\b/, ""),
+			color: valueLook.color
+		};
+	},
+
+	applyLook: function(element, baseClass, look) {
 		element.className = (baseClass + " " + look.className).trim();
 		if (look.color) {
 			element.style.setProperty("color", look.color, "important");
 		}
+	},
+
+	// Gives element the look of a value next to its own classes. The colour
+	// goes inline and important, the theme's .value rule is important too.
+	paintValue: function(element, baseClass, key, value, remote) {
+		var look = this.valueLook(key, value, remote);
+		this.applyLook(element, baseClass, look);
 		return look;
 	},
 
@@ -329,12 +351,18 @@ Module.register("MMM-Currentweather-MQTT",{
 			elements.push(spacer);
 
 			var windSpeed = document.createElement("span");
-			this.paintValue(windSpeed, "", "windSpeed", this.windSpeed, this.isRemoteSource(this.sourceWindSpeed));
+			var speedLook = this.paintValue(windSpeed, "", "windSpeed", this.windSpeed, this.isRemoteSource(this.sourceWindSpeed));
 			windSpeed.innerHTML = " " + this.windSpeed;
 			elements.push(windSpeed);
 
+			var windUnit = document.createElement("sup");
+			this.applyLook(windUnit, "unit unit-text", this.unitLook(speedLook));
+			windUnit.textContent = this.windSpeedUnit();
+			elements.push(windUnit);
+
 			if (this.config.showWindDirection) {
 				var windDirection = document.createElement("sup");
+				// The direction is its own reading, not the speed's unit: module colour.
 				windDirection.className = "unit" + (remote ? " yellow" : "");
 				if (this.config.showWindDirectionAsArrow) {
 					if (this.windDeg !== null) {
@@ -360,11 +388,11 @@ Module.register("MMM-Currentweather-MQTT",{
 			humidityIcon.className = "wi wi-raindrop dimmed" + (remote ? " yellow" : "");
 
 			var humidity = document.createElement("span");
-			this.paintValue(humidity, "", "humidity", this.humidity, remote);
+			var humidityLook = this.paintValue(humidity, "", "humidity", this.humidity, remote);
 			humidity.innerHTML = " " + this.humidity;
 
 			var humidityUnit = document.createElement("sup");
-			humidityUnit.className = "unit unit-text" + (remote ? " yellow" : "");
+			this.applyLook(humidityUnit, "unit unit-text", this.unitLook(humidityLook));
 			humidityUnit.innerHTML = "%";
 
 			return [humidityIcon, humidity, humidityUnit];
@@ -380,12 +408,12 @@ Module.register("MMM-Currentweather-MQTT",{
 			pressureIcon.className = "wi wi-barometer dimmed";
 
 			var pressure = document.createElement("span");
-			this.paintValue(pressure, "", "pressure", this.pressure, remote);
+			var pressureLook = this.paintValue(pressure, "", "pressure", this.pressure, remote);
 			pressure.innerHTML = " " + this.pressure;
 
 			// The unit rides raised and small, the way the humidity sign does.
 			var pressureUnit = document.createElement("sup");
-			pressureUnit.className = "unit unit-text" + (remote ? " yellow" : "");
+			this.applyLook(pressureUnit, "unit unit-text", this.unitLook(pressureLook));
 			pressureUnit.innerHTML = "hPa";
 
 			return [pressureIcon, pressure, pressureUnit];

@@ -255,4 +255,19 @@ assert.deepStrictEqual(look.valueLook("windSpeed", "30 km/h", true),
 // A value without a scale keeps the old marking.
 assert.deepStrictEqual(look.valueLook("pressure", 1019, true), { className: "value yellow", color: null });
 
+// A unit wears the colour of its value, without a second remote dot.
+assert.deepStrictEqual(look.unitLook({ className: "value remote", color: "#00ff00" }), { className: "value", color: "#00ff00" });
+assert.deepStrictEqual(look.unitLook({ className: "value yellow", color: null }), { className: "value yellow", color: null });
+assert.deepStrictEqual(look.unitLook({ className: "value", color: null }), { className: "value", color: null });
+
+// The wind speed unit follows the display mode the speed is converted to.
+const windUnit = mirror();
+windUnit.config.useBeaufort = false;
+windUnit.config.useKMPHwind = true;
+assert.strictEqual(windUnit.windSpeedUnit(), "km/h");
+windUnit.config.useKMPHwind = false;
+assert.strictEqual(windUnit.windSpeedUnit(), "m/s");
+windUnit.config.useBeaufort = true;
+assert.strictEqual(windUnit.windSpeedUnit(), "Bft");
+
 console.log("module wiring: all checks passed");
