@@ -81,3 +81,12 @@
 .MMM-Currentweather-MQTT .white {
   color: white;
 }
+
+/* A coloured value not from a local sensor: the colour shows the level,
+   this small raised dot shows the source. Restyle in custom.css. */
+.MMM-Currentweather-MQTT .remote::after {
+  content: "\2022";
+  font-size: 50%;
+  vertical-align: super;
+  opacity: 0.7;
+}

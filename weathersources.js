@@ -104,6 +104,28 @@
 		return name ? prefix + "-" + name : null;
 	}
 
+	/* A level for a number from configured thresholds, for values whose source
+	 * reports no level of its own (temperature, UV index).
+	 *
+	 * thresholds - [{ below: 0, level: "freezing" }, ..., { level: "hot" }],
+	 *              lowest first; an entry without "below" takes the rest
+	 * returns the level of the first entry the value is below, or null when
+	 * there are no thresholds, no number or no entry fits.
+	 */
+	function levelFor(value, thresholds) {
+		var number = parseFloat(value);
+		if (!Array.isArray(thresholds) || isNaN(number)) {
+			return null;
+		}
+		for (var i = 0; i < thresholds.length; i++) {
+			var below = thresholds[i].below;
+			if (typeof below === "undefined" || number < below) {
+				return thresholds[i].level;
+			}
+		}
+		return null;
+	}
+
 	/* priority   - array of source names, most wanted first
 	 * candidates - map source name -> { value, time, maxAgeSeconds, unit }
 	 * returns    - { source, value, unit } or null when no source has a value
@@ -130,6 +152,7 @@
 		resolve: resolve,
 		metnoValues: metnoValues,
 		levelClass: levelClass,
+		levelFor: levelFor,
 		toMetersPerSecond: toMetersPerSecond,
 		toSeaLevel: toSeaLevel,
 		WIND_SPEED_TO_MS: WIND_SPEED_TO_MS

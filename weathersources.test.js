@@ -1,7 +1,7 @@
 /* Self-check for the source resolver: node weathersources.test.js */
 
 const assert = require("assert");
-const { resolve, toMetersPerSecond, toSeaLevel, metnoValues, levelClass } = require("./weathersources.js");
+const { resolve, toMetersPerSecond, toSeaLevel, metnoValues, levelClass, levelFor } = require("./weathersources.js");
 
 const NOW = 1_000_000_000_000;
 const fresh = (value, unit) => ({ value, time: NOW - 60_000, maxAgeSeconds: 1800, unit });
@@ -74,6 +74,21 @@ assert.strictEqual(levelClass("air-quality", "Medium"), "air-quality-medium");
 assert.strictEqual(levelClass("air-quality", "<b>x</b>"), "air-quality-b-x-b");
 assert.strictEqual(levelClass("air-quality", ""), null);
 assert.strictEqual(levelClass("air-quality", undefined), null);
+
+// Threshold levels: the first entry the value is below wins, an entry
+// without "below" takes everything above the last threshold.
+const TEMP = [{ below: 0, level: "freezing" }, { below: 10, level: "cold" }, { level: "hot" }];
+assert.strictEqual(levelFor(-5, TEMP), "freezing");
+assert.strictEqual(levelFor(0, TEMP), "cold");          // a threshold belongs to the level above it
+assert.strictEqual(levelFor(9.9, TEMP), "cold");
+assert.strictEqual(levelFor(35, TEMP), "hot");
+// No catch-all entry: above the last threshold there is no level.
+assert.strictEqual(levelFor(12, [{ below: 10, level: "cold" }]), null);
+// No thresholds configured, or no number to compare: no level.
+assert.strictEqual(levelFor(5, undefined), null);
+assert.strictEqual(levelFor(5, []), null);
+assert.strictEqual(levelFor(NaN, TEMP), null);
+assert.strictEqual(levelFor(null, TEMP), null);
 
 console.log("weathersources: all checks passed");
 
@@ -224,5 +239,18 @@ assert.deepStrictEqual(air.airQualityValue(owmData), { value: 45, levelClass: nu
 // Home Assistant gone too long: no air quality at all, OpenWeatherMap has none.
 air.externalValues.hass = { time: Date.now() - 2 * 3600 * 1000, values: { airQuality: 45, airQualityLevel: "low" } };
 assert.strictEqual(air.airQualityValue(owmData), null);
+
+// Value colour: a configured level replaces the yellow "not a local sensor"
+// mark with the level class plus the separate "remote" mark.
+const colour = mirror();
+assert.strictEqual(colour.valueClass("temperature", 30, false), "");
+assert.strictEqual(colour.valueClass("temperature", 30, true), "yellow");
+colour.config.levels = { temperature: TEMP, uvIndex: [{ below: 3, level: "low" }, { level: "high" }] };
+assert.strictEqual(colour.valueClass("temperature", -2, false), "temperature-freezing");
+assert.strictEqual(colour.valueClass("temperature", "12", true), "temperature-hot remote");
+assert.strictEqual(colour.valueClass("uvIndex", 7, true), "uv-index-high remote");
+// Outside every configured level the old marking stays.
+colour.config.levels.temperature = [{ below: 0, level: "freezing" }];
+assert.strictEqual(colour.valueClass("temperature", 5, true), "yellow");
 
 console.log("module wiring: all checks passed");

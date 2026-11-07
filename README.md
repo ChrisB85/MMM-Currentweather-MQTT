@@ -193,6 +193,48 @@ default, so list both rows. A misspelt name or a name in both rows is logged
 in the browser console and skipped (a repeated name stays in the first row).
 The default keeps everything in the row above, as before.
 
+### Colour levels
+
+The air quality index takes its colour from the level its source reports.
+For values whose source has no level, `levels` sets thresholds per value,
+keyed like `sources` (`temperature`, `uvIndex`), lowest first, in the display
+units of `config.units`:
+
+```js
+levels: {
+    temperature: [
+        { below: 0, level: "freezing" },
+        { below: 10, level: "cold" },
+        { below: 20, level: "mild" },
+        { below: 28, level: "warm" },
+        { level: "hot" },               // no "below": everything above
+    ],
+    uvIndex: [                          // WHO bands
+        { below: 3, level: "low" },
+        { below: 6, level: "moderate" },
+        { below: 8, level: "high" },
+        { below: 11, level: "very-high" },
+        { level: "extreme" },
+    ],
+},
+```
+
+A value gets the first level it is below; a threshold belongs to the level
+above it. Each level becomes a class `<value in kebab case>-<level>`
+(`temperature-hot`, `uv-index-very-high`) and the theme colours it, e.g. in
+`custom.css`:
+
+```css
+.module.MMM-Currentweather-MQTT .temperature-hot { color: #ff5a3c !important; }
+```
+
+Temperature levels also colour feels-like and today's min/max. A level with
+no CSS rule keeps the default colour. Without `levels` nothing changes.
+
+A coloured value not from a local sensor loses the yellow mark (the colour
+now means the level) and gets the `remote` class instead, a small raised dot
+by default. Uncoloured values stay yellow as before.
+
 ## Value sources
 
 Every displayed value names the sources to try, in order. The first source that
