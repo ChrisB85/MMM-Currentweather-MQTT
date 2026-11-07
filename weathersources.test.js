@@ -263,8 +263,9 @@ assert.deepStrictEqual(look.partLook({ className: "value", color: null }), { cla
 // Whole sensors: every element of a sensor takes its value's look.
 global.document = {
 	createElement: (tag) => ({
-		tag, className: "", innerHTML: "", textContent: "",
-		style: { color: null, setProperty(name, value) { if (name === "color") { this.color = value; } } }
+		tag, className: "", innerHTML: "", textContent: "", children: [],
+		style: { color: null, setProperty(name, value) { if (name === "color") { this.color = value; } } },
+		appendChild(child) { this.children.push(child); }
 	})
 };
 const sensor = mirror();
@@ -298,6 +299,19 @@ for (const part of parts("pressure")) {
 // Air quality without a scale: the source level colours label and value alike.
 for (const part of parts("airQuality")) {
 	assert.ok(/air-quality-medium/.test(part.className), part.className);
+}
+// Wind: the direction arrow inside its sup takes the speed colour too, the
+// theme's catch-all rule would otherwise colour the <i> on its own.
+sensor.config.showWindDirection = true;
+sensor.config.showWindDirectionAsArrow = true;
+sensor.config.scales.windSpeed = [{ at: 0, color: "#ff0000" }];
+sensor.windSpeed = "9"; sensor.sourceWindSpeed = "hass"; sensor.windDeg = 135;
+const windParts = parts("wind");
+const arrow = windParts[windParts.length - 1].children[0];
+assert.strictEqual(arrow.tag, "i");
+assert.strictEqual(arrow.style.color, "#ff0000");
+for (const part of windParts) {
+	assert.strictEqual(part.style.color, "#ff0000");
 }
 delete global.document;
 

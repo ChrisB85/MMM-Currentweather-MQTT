@@ -100,9 +100,19 @@
   margin-top: var(--extra-row-gap, 0);
 }
 
-/* The raindrop glyph sits about 2 px above the digits next to it at the
-   mirror's size; nudge it onto their middle. */
-.MMM-Currentweather-MQTT .wi-raindrop {
-  position: relative;
-  top: 0.07em;
-}
+/* Weather Icons glyphs differ in size: scale the ones in the extra rows to
+   one optical height, about 24 px next to 21 px digits on the mirror. */
+.MMM-Currentweather-MQTT .extra-item .wi-strong-wind { font-size: 1.2em; }
+.MMM-Currentweather-MQTT .extra-item .wi-raindrop { font-size: 1.15em; }
+.MMM-Currentweather-MQTT .extra-item .wi-barometer { font-size: 0.86em; }
+.MMM-Currentweather-MQTT .extra-item .wi-sunrise,
+.MMM-Currentweather-MQTT .extra-item .wi-sunset { font-size: 0.7em; }
+
+/* Each glyph sits at its own height; nudge the scaled ones onto the middle
+   of the digits next to them (measured on the mirror). */
+.MMM-Currentweather-MQTT .extra-item .wi { position: relative; }
+.MMM-Currentweather-MQTT .extra-item .wi-strong-wind { top: 0.045em; }
+.MMM-Currentweather-MQTT .extra-item .wi-raindrop { top: 0.1em; }
+.MMM-Currentweather-MQTT .extra-item .wi-barometer { top: -0.04em; }
+.MMM-Currentweather-MQTT .extra-item .wi-sunrise,
+.MMM-Currentweather-MQTT .extra-item .wi-sunset { top: -0.1em; }

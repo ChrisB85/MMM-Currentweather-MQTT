@@ -355,9 +355,6 @@ Module.register("MMM-Currentweather-MQTT",{
 			var windIcon = document.createElement("span");
 			windIcon.className = "wi wi-strong-wind";
 
-			var spacer = document.createElement("sup");
-			spacer.innerHTML = "&nbsp;&nbsp;&nbsp;&nbsp;";
-
 			var windSpeed = document.createElement("span");
 			windSpeed.innerHTML = " " + this.windSpeed;
 
@@ -366,13 +363,19 @@ Module.register("MMM-Currentweather-MQTT",{
 			windUnit.textContent = this.windSpeedUnit();
 
 			var parts = [windIcon, windUnit];
-			var elements = [windIcon, spacer, windSpeed, windUnit];
+			var elements = [windIcon, windSpeed, windUnit];
 			if (this.config.showWindDirection) {
 				var windDirection = document.createElement("sup");
 				windDirection.className = "unit";
 				if (this.config.showWindDirectionAsArrow) {
 					if (this.windDeg !== null) {
-						windDirection.innerHTML = "<i class=\"fa fa-long-arrow-down\" style=\"transform:rotate(" + this.windDeg + "deg);\"></i>";
+						// The arrow is its own element: the theme's catch-all rule
+						// colours it directly, so it takes the sensor look itself.
+						var arrow = document.createElement("i");
+						arrow.className = "fa fa-long-arrow-down";
+						arrow.style.transform = "rotate(" + this.windDeg + "deg)";
+						windDirection.appendChild(arrow);
+						parts.push(arrow);
 					}
 				} else {
 					windDirection.innerHTML = " " + this.translate(this.windDirection);
